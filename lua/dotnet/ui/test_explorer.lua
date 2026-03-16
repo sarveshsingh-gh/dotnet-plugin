@@ -515,14 +515,14 @@ local function setup_keymaps()
     render()
   end)
 
-  -- Collapse/expand all
-  map("zM", function()
+  -- Collapse/expand all (same keys as solution explorer)
+  map("W", function()
     for _, node in ipairs(S.nodes) do
       if node.kind ~= "method" then node.collapsed = true end
     end
     render()
   end)
-  map("zR", function()
+  map("E", function()
     for _, node in ipairs(S.nodes) do node.collapsed = false end
     render()
   end)
@@ -530,25 +530,56 @@ local function setup_keymaps()
   -- Close
   map("q", function() M.close() end)
 
-  -- Help hint
+  -- Help — floating popup (same style as solution explorer)
   map("?", function()
-    local lines = {
-      " Test Explorer Keys ",
-      "",
-      "  <CR>    Run test/class or toggle",
-      "  <Space> Toggle collapse",
-      "  r       Run node under cursor",
-      "  R       Run all tests",
-      "  f       Re-run failed tests",
-      "  c       Clear results",
-      "  e       Refresh (re-discover tests)",
-      "  <F5>    Run all tests",
-      "  zM      Collapse all",
-      "  zR      Expand all",
-      "  q       Close",
-      "  ?       This help",
+    local KEYS = {
+      { key = "<CR>",    desc = "Run test / class or toggle collapse" },
+      { key = "<Space>", desc = "Toggle collapse" },
+      { key = "r",       desc = "Run node under cursor" },
+      { key = "R",       desc = "Run all tests" },
+      { key = "f",       desc = "Re-run failed tests" },
+      { key = "c",       desc = "Clear results" },
+      { key = "e",       desc = "Refresh (re-discover tests)" },
+      { key = "<F5>",    desc = "Run all tests" },
+      { key = "W",       desc = "Collapse all" },
+      { key = "E",       desc = "Expand all" },
+      { key = "q",       desc = "Close" },
+      { key = "?",       desc = "Toggle this help" },
     }
-    require("dotnet.notify").info(table.concat(lines, "\n"))
+    local buf = vim.api.nvim_create_buf(false, true)
+    vim.bo[buf].bufhidden = "wipe"
+    local lines = { " Test Explorer — Keybindings ", "" }
+    local width = #lines[1]
+    for _, k in ipairs(KEYS) do
+      local line = string.format("  %-12s  %s", k.key, k.desc)
+      table.insert(lines, line)
+      width = math.max(width, #line + 2)
+    end
+    table.insert(lines, "")
+    vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+    vim.bo[buf].modifiable = false
+    local ui = vim.api.nvim_list_uis()[1]
+    local h  = #lines
+    local win = vim.api.nvim_open_win(buf, true, {
+      relative  = "editor",
+      row       = math.floor((ui.height - h) / 2),
+      col       = math.floor((ui.width  - width) / 2),
+      width     = width, height = h,
+      style     = "minimal", border = "rounded",
+      title = " Help ", title_pos = "center",
+    })
+    local ns = vim.api.nvim_create_namespace("dotnet_te_help")
+    vim.api.nvim_buf_add_highlight(buf, ns, "Title", 0, 0, -1)
+    for i, k in ipairs(KEYS) do
+      vim.api.nvim_buf_add_highlight(buf, ns, "Special", i + 1, 2, 14)
+      vim.api.nvim_buf_add_highlight(buf, ns, "Comment", i + 1, 16, -1)
+    end
+    local close_help = function()
+      if vim.api.nvim_win_is_valid(win) then vim.api.nvim_win_close(win, true) end
+    end
+    for _, k in ipairs({ "q", "?", "<Esc>" }) do
+      vim.api.nvim_buf_set_keymap(buf, "n", k, "", { callback = close_help, noremap = true, silent = true })
+    end
   end)
 end
 
