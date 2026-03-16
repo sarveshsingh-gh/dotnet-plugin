@@ -83,7 +83,8 @@ function M.setup(user_opts)
       vim.keymap.set("n", "t", function()
         local proj = proj_for_buf()
         if not proj then require("dotnet.notify").warn("Not in a dotnet project"); return end
-        local method = require("dotnet.dap.init").test_method_at_cursor()
+        local dap_m  = require("dotnet.dap.init")
+        local method = dap_m.test_method_at_cursor()
         local filter = method and ("FullyQualifiedName~" .. method) or nil
         local signs = require("dotnet.ui.test_signs")
         signs.mark_running(proj)

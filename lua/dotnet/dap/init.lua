@@ -20,12 +20,18 @@ function M.test_method_at_cursor()
       node = node:parent()
     end
   end
-  -- Regex fallback: search upward for method signature
+  -- Regex fallback: find last word before ( on a public method line
   local row = vim.api.nvim_win_get_cursor(0)[1]
   local lines = vim.api.nvim_buf_get_lines(0, 0, row, false)
   for i = #lines, 1, -1 do
-    local m = lines[i]:match("public%s+.-%s+(%w+)%s*%(")
-    if m and m ~= "class" then return m end
+    local l = lines[i]
+    if l:match("^%s*public%s") and l:match("%(") then
+      -- grab the identifier right before the first (
+      local m = l:match("(%w+)%s*%(")
+      if m and m ~= "class" and m ~= "public" and m ~= "void" and m ~= "Task" and m ~= "ValueTask" then
+        return m
+      end
+    end
   end
   return nil
 end
@@ -65,8 +71,10 @@ function M.debug_test_project(proj_path, filter)
                 vim.fn.mkdir(results_dir, "p")
                 local signs = require("dotnet.ui.test_signs")
                 signs.mark_running(proj_path)
-                vim.fn.jobstart({ "dotnet", "test", "--nologo", "--no-build",
-                                  "--logger", "trx", "--results-directory", results_dir, proj_path }, {
+                local trx_cmd = { "dotnet", "test", "--nologo", "--no-build",
+                                  "--logger", "trx", "--results-directory", results_dir, proj_path }
+                if filter then vim.list_extend(trx_cmd, { "--filter", filter }) end
+                vim.fn.jobstart(trx_cmd, {
                   cwd = proj_dir,
                   on_exit = function(_, _code)
                     vim.schedule(function()
