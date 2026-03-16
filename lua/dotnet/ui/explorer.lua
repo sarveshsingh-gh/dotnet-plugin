@@ -366,28 +366,23 @@ local function action_new_item(proj_node, target_dir)
         file_path  = dest_abs .. "/" .. base .. tpl.ext
         name       = base
       end
-      local stderr = {}
-      local args   = tpl.predefined
+      local args = tpl.predefined
         and { "dotnet", "new", tpl.value, "-o", o_flag }
         or  { "dotnet", "new", tpl.value, "-o", o_flag, "-n", name }
-      vim.fn.jobstart(args, {
-        cwd       = proj_dir,
-        on_stderr = function(_, d) for _, l in ipairs(d) do if l ~= "" then table.insert(stderr, l) end end end,
-        on_exit   = function(_, code)
-          vim.schedule(function()
-            if code ~= 0 then
-              require("dotnet.notify").error("new item failed:\n" .. table.concat(stderr, "\n"))
-              return
-            end
-            if tpl.ext == ".cs" and vim.fn.filereadable(file_path) == 1 then
-              local ns = namespace_m.compute(proj_node.path, file_path)
-              namespace_m.patch_file(file_path, ns)
-            end
-            refresh()
-            if vim.fn.filereadable(file_path) == 1 then
-              action_open_file({ path = file_path, kind = "file" })
-            end
-          end)
+      runner.bg(args, {
+        cwd   = proj_dir,
+        label = "New " .. (tpl.label or name),
+        notify_success = false,
+        on_exit = function(code)
+          if code ~= 0 then return end
+          if tpl.ext == ".cs" and vim.fn.filereadable(file_path) == 1 then
+            local ns = namespace_m.compute(proj_node.path, file_path)
+            namespace_m.patch_file(file_path, ns)
+          end
+          refresh()
+          if vim.fn.filereadable(file_path) == 1 then
+            action_open_file({ path = file_path, kind = "file" })
+          end
         end,
       })
     end
@@ -425,42 +420,22 @@ end
 local function action_remove_package(node)
   local proj_dir = vim.fn.fnamemodify(node._proj_path, ":h")
   confirm("Remove package '" .. node._pkg_name .. "'?", function()
-    local stderr = {}
-    vim.fn.jobstart({ "dotnet", "remove", "package", node._pkg_name }, {
-      cwd       = proj_dir,
-      on_stderr = function(_, d) for _, l in ipairs(d) do if l ~= "" then table.insert(stderr, l) end end end,
-      on_exit   = function(_, code)
-        vim.schedule(function()
-          if code ~= 0 then
-            require("dotnet.notify").error("remove failed:\n" .. table.concat(stderr, "\n"))
-          else
-            require("dotnet.notify").info("Removed " .. node._pkg_name)
-            refresh()
-          end
-        end)
-      end,
+    runner.bg({ "dotnet", "remove", "package", node._pkg_name }, {
+      cwd   = proj_dir,
+      label = "Remove " .. node._pkg_name,
+      on_exit = function(code) if code == 0 then refresh() end end,
     })
   end)
 end
 
 local function action_remove_projref(node)
-  local proj_dir  = vim.fn.fnamemodify(node._proj_path, ":h")
-  local ref_name  = vim.fn.fnamemodify(node._ref_path, ":t:r")
+  local proj_dir = vim.fn.fnamemodify(node._proj_path, ":h")
+  local ref_name = vim.fn.fnamemodify(node._ref_path, ":t:r")
   confirm("Remove reference '" .. ref_name .. "'?", function()
-    local stderr = {}
-    vim.fn.jobstart({ "dotnet", "remove", "reference", node._ref_path }, {
-      cwd       = proj_dir,
-      on_stderr = function(_, d) for _, l in ipairs(d) do if l ~= "" then table.insert(stderr, l) end end end,
-      on_exit   = function(_, code)
-        vim.schedule(function()
-          if code ~= 0 then
-            require("dotnet.notify").error("remove ref failed:\n" .. table.concat(stderr, "\n"))
-          else
-            require("dotnet.notify").info("Removed ref " .. ref_name)
-            refresh()
-          end
-        end)
-      end,
+    runner.bg({ "dotnet", "remove", "reference", node._ref_path }, {
+      cwd   = proj_dir,
+      label = "Remove ref " .. ref_name,
+      on_exit = function(code) if code == 0 then refresh() end end,
     })
   end)
 end
@@ -484,25 +459,15 @@ local function action_remove_from_project(proj_node)
     format_item = function(i) return i.label end,
   }, function(item)
     if not item then return end
-    local stderr = {}
-    local args   = item.kind == "pkg"
+    local args  = item.kind == "pkg"
       and { "dotnet", "remove", "package", item.name }
       or  { "dotnet", "remove", "reference", item.path }
-    local label  = item.kind == "pkg" and item.name or vim.fn.fnamemodify(item.path, ":t:r")
+    local label = item.kind == "pkg" and item.name or vim.fn.fnamemodify(item.path, ":t:r")
     confirm("Remove '" .. label .. "'?", function()
-      vim.fn.jobstart(args, {
-        cwd       = item.proj_dir,
-        on_stderr = function(_, d) for _, l in ipairs(d) do if l ~= "" then table.insert(stderr, l) end end end,
-        on_exit   = function(_, code)
-          vim.schedule(function()
-            if code ~= 0 then
-              require("dotnet.notify").error("remove failed:\n" .. table.concat(stderr, "\n"))
-            else
-              require("dotnet.notify").info("Removed " .. label)
-              refresh()
-            end
-          end)
-        end,
+      runner.bg(args, {
+        cwd   = item.proj_dir,
+        label = "Remove " .. label,
+        on_exit = function(code) if code == 0 then refresh() end end,
       })
     end)
   end)

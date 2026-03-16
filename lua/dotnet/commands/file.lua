@@ -53,30 +53,23 @@ local function do_new_item(proj_path, target_dir)
         name       = base
       end
 
-      local stderr = {}
-      local args   = tpl.predefined
+      local args = tpl.predefined
         and { "dotnet", "new", tpl.value, "-o", o_flag }
         or  { "dotnet", "new", tpl.value, "-o", o_flag, "-n", name }
 
-      vim.fn.jobstart(args, {
-        cwd       = proj_dir,
-        on_stderr = function(_, d) for _, l in ipairs(d) do if l ~= "" then table.insert(stderr, l) end end end,
-        on_exit   = function(_, code)
-          vim.schedule(function()
-            if code ~= 0 then
-              require("dotnet.notify").error("new item failed:\n" .. table.concat(stderr, "\n"))
-              return
-            end
-            -- Fix namespace for .cs files
-            if tpl.ext == ".cs" and vim.fn.filereadable(file_path) == 1 then
-              local ns = namespace.compute(proj_path, file_path)
-              namespace.patch_file(file_path, ns)
-            end
-            -- Open the file
-            if vim.fn.filereadable(file_path) == 1 then
-              vim.cmd("edit " .. vim.fn.fnameescape(file_path))
-            end
-          end)
+      require("dotnet.core.runner").bg(args, {
+        cwd   = proj_dir,
+        label = "New " .. (tpl.label or name),
+        notify_success = false,
+        on_exit = function(code)
+          if code ~= 0 then return end
+          if tpl.ext == ".cs" and vim.fn.filereadable(file_path) == 1 then
+            local ns = namespace.compute(proj_path, file_path)
+            namespace.patch_file(file_path, ns)
+          end
+          if vim.fn.filereadable(file_path) == 1 then
+            vim.cmd("edit " .. vim.fn.fnameescape(file_path))
+          end
         end,
       })
     end

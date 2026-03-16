@@ -37,38 +37,18 @@ end
 
 --- Add a project to the solution (runs dotnet sln add).
 function M.add_project(sln_path, proj_path, cb)
-  local stderr = {}
-  vim.fn.jobstart({ "dotnet", "sln", sln_path, "add", proj_path }, {
-    on_stderr = function(_, d) for _, l in ipairs(d) do if l ~= "" then table.insert(stderr, l) end end end,
-    on_exit   = function(_, code)
-      vim.schedule(function()
-        if code ~= 0 then
-          require("dotnet.notify").error("sln add failed:\n" .. table.concat(stderr, "\n"))
-        else
-          require("dotnet.notify").info("Project added to solution")
-          if cb then cb() end
-        end
-      end)
-    end,
-  })
+  require("dotnet.core.runner").bg(
+    { "dotnet", "sln", sln_path, "add", proj_path },
+    { label = "Add project to solution", on_exit = function(code) if code == 0 and cb then cb() end end }
+  )
 end
 
 --- Remove a project from the solution (runs dotnet sln remove).
 function M.remove_project(sln_path, proj_path, cb)
-  local stderr = {}
-  vim.fn.jobstart({ "dotnet", "sln", sln_path, "remove", proj_path }, {
-    on_stderr = function(_, d) for _, l in ipairs(d) do if l ~= "" then table.insert(stderr, l) end end end,
-    on_exit   = function(_, code)
-      vim.schedule(function()
-        if code ~= 0 then
-          require("dotnet.notify").error("sln remove failed:\n" .. table.concat(stderr, "\n"))
-        else
-          require("dotnet.notify").info("Project removed from solution")
-          if cb then cb() end
-        end
-      end)
-    end,
-  })
+  require("dotnet.core.runner").bg(
+    { "dotnet", "sln", sln_path, "remove", proj_path },
+    { label = "Remove project from solution", on_exit = function(code) if code == 0 and cb then cb() end end }
+  )
 end
 
 return M

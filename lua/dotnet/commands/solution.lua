@@ -56,25 +56,18 @@ reg("solution.new_project", {
         if not name or name == "" then return end
         picker.solution(function(sln)
           local sln_dir = vim.fn.fnamemodify(sln, ":h")
-          local out     = sln_dir .. "/" .. name
-          local stderr  = {}
-          vim.fn.jobstart({ "dotnet", "new", tpl.value, "-o", out, "-n", name }, {
-            on_stderr = function(_, d) for _, l in ipairs(d) do if l ~= "" then table.insert(stderr, l) end end end,
-            on_exit   = function(_, code)
-              vim.schedule(function()
-                if code ~= 0 then
-                  require("dotnet.notify").error("new project failed:\n" .. table.concat(stderr, "\n"))
-                  return
-                end
+          local out = sln_dir .. "/" .. name
+          require("dotnet.core.runner").bg(
+            { "dotnet", "new", tpl.value, "-o", out, "-n", name },
+            { label = "New project " .. name, notify_success = false,
+              on_exit = function(code)
+                if code ~= 0 then return end
                 local proj_file = out .. "/" .. name .. ".csproj"
                 if vim.fn.filereadable(proj_file) == 1 then
-                  solution.add_project(sln, proj_file, function()
-                    require("dotnet.notify").info("Created and added: " .. name)
-                  end)
+                  solution.add_project(sln, proj_file)
                 end
-              end)
-            end,
-          })
+              end }
+          )
         end)
       end)
     end)

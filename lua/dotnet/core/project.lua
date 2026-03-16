@@ -114,40 +114,20 @@ end
 
 --- Add a project reference.
 function M.add_ref(proj_path, ref_path, cb)
-  local stderr = {}
-  vim.fn.jobstart({ "dotnet", "add", proj_path, "reference", ref_path }, {
-    on_stderr = function(_, d) for _, l in ipairs(d) do if l ~= "" then table.insert(stderr, l) end end end,
-    on_exit   = function(_, code)
-      vim.schedule(function()
-        if code ~= 0 then
-          require("dotnet.notify").error("add reference failed:\n" .. table.concat(stderr, "\n"))
-        else
-          require("dotnet.notify").info("Reference added")
-          if cb then cb() end
-        end
-      end)
-    end,
-  })
+  local name = vim.fn.fnamemodify(ref_path, ":t:r")
+  require("dotnet.core.runner").bg(
+    { "dotnet", "add", proj_path, "reference", ref_path },
+    { label = "Add reference " .. name, on_exit = function(code) if code == 0 and cb then cb() end end }
+  )
 end
 
 --- Remove a package or project reference (cwd = project dir).
 function M.remove(proj_dir, kind, name_or_path, cb)
-  -- kind: "package" | "reference"
-  local stderr = {}
-  vim.fn.jobstart({ "dotnet", "remove", kind, name_or_path }, {
-    cwd       = proj_dir,
-    on_stderr = function(_, d) for _, l in ipairs(d) do if l ~= "" then table.insert(stderr, l) end end end,
-    on_exit   = function(_, code)
-      vim.schedule(function()
-        if code ~= 0 then
-          require("dotnet.notify").error("remove failed:\n" .. table.concat(stderr, "\n"))
-        else
-          require("dotnet.notify").info("Removed " .. name_or_path)
-          if cb then cb() end
-        end
-      end)
-    end,
-  })
+  local name = vim.fn.fnamemodify(name_or_path, ":t:r")
+  require("dotnet.core.runner").bg(
+    { "dotnet", "remove", kind, name_or_path },
+    { cwd = proj_dir, label = "Remove " .. name, on_exit = function(code) if code == 0 and cb then cb() end end }
+  )
 end
 
 return M
