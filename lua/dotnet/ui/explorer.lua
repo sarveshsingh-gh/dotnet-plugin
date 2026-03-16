@@ -668,6 +668,7 @@ local function setup_keymaps()
   vim.keymap.set("n", "<F5>",  refresh,  o)
   vim.keymap.set("n", "q",     M.close,  o)
   vim.keymap.set("n", "<esc>", M.close,  o)
+  vim.keymap.set("n", "gx",    function() require("dotnet.telescope.jobs").open() end, o)
 end
 
 local function open_win()
