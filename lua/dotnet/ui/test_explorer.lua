@@ -342,7 +342,7 @@ local function run_tests(filter, proj_path, label)
         end
         -- Roll up classes from methods
         for _, cls_node in ipairs(S.nodes) do
-          if cls_node.depth == 3 then
+          if cls_node.depth == 3 and cls_node.fqn then
             local worst = nil
             for _, m in ipairs(S.nodes) do
               if m.depth == 4 and m.proj == cls_node.proj
