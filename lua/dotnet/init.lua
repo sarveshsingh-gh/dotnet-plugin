@@ -79,19 +79,22 @@ function M.setup(user_opts)
         end
       end
 
-      -- t: run tests for the project that owns this file
+      -- t: run test under cursor (or all tests in project if no method detected)
       vim.keymap.set("n", "t", function()
         local proj = proj_for_buf()
         if not proj then require("dotnet.notify").warn("Not in a dotnet project"); return end
+        local method = require("dotnet.dap.init").test_method_at_cursor()
+        local filter = method and ("FullyQualifiedName~" .. method) or nil
         local signs = require("dotnet.ui.test_signs")
         signs.mark_running(proj)
         local results_dir = vim.fn.tempname()
         vim.fn.mkdir(results_dir, "p")
-        local runner = require("dotnet.core.runner")
         local notify = require("dotnet.notify")
-        local spin   = notify.start_spinner("Test " .. vim.fn.fnamemodify(proj, ":t"))
-        vim.fn.jobstart({ "dotnet", "test", "--nologo", "--logger", "trx",
-                          "--results-directory", results_dir, proj }, {
+        local label  = method and method or vim.fn.fnamemodify(proj, ":t")
+        local spin   = notify.start_spinner("Test " .. label)
+        local cmd = { "dotnet", "test", "--nologo", "--logger", "trx", "--results-directory", results_dir, proj }
+        if filter then vim.list_extend(cmd, { "--filter", filter }) end
+        vim.fn.jobstart(cmd, {
           cwd     = vim.fn.fnamemodify(proj, ":h"),
           on_exit = function(_, code)
             vim.schedule(function()
