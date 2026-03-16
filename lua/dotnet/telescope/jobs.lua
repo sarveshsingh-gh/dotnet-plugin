@@ -1,9 +1,46 @@
 -- Telescope picker: all dotnet jobs — running and completed.
--- gx (or jobs.list): open picker
--- <Enter> on running  → stop job
--- <Enter> on finished → remove from log
--- <C-x>              → clear all finished logs
+-- gx          → open picker
+-- <CR>        → open full log in a split (scrollable)
+-- <C-s>       → stop running job
+-- <C-x>       → clear all finished logs
 local M = {}
+
+local function open_log_buf(lines, title)
+  -- reuse existing log window if open
+  for _, win in ipairs(vim.api.nvim_list_wins()) do
+    local buf = vim.api.nvim_win_get_buf(win)
+    if vim.b[buf]._dotnet_log then
+      vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+      vim.api.nvim_set_current_win(win)
+      pcall(vim.api.nvim_win_set_cursor, win, { math.max(1, #lines), 0 })
+      return
+    end
+  end
+  vim.cmd("botright 20split")
+  local win = vim.api.nvim_get_current_win()
+  local buf = vim.api.nvim_create_buf(false, true)
+  vim.api.nvim_win_set_buf(win, buf)
+  vim.b[buf]._dotnet_log = true
+  vim.bo[buf].buftype    = "nofile"
+  vim.bo[buf].bufhidden  = "wipe"
+  vim.bo[buf].filetype   = "log"
+  vim.bo[buf].swapfile   = false
+  vim.api.nvim_buf_set_name(buf, title or "Dotnet Log")
+  vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+  pcall(vim.api.nvim_win_set_cursor, win, { math.max(1, #lines), 0 })
+  -- q closes the log window
+  vim.keymap.set("n", "q", "<cmd>close<cr>", { buffer = buf, silent = true })
+end
+
+local function get_lines(e)
+  if e.buf and vim.api.nvim_buf_is_valid(e.buf) then
+    local n = vim.api.nvim_buf_line_count(e.buf)
+    return vim.api.nvim_buf_get_lines(e.buf, math.max(0, n - 500), n, false)
+  elseif e.lines and #e.lines > 0 then
+    return e.lines
+  end
+  return { "(no output captured)" }
+end
 
 function M.open()
   local runner = require("dotnet.core.runner")
@@ -16,42 +53,33 @@ function M.open()
   local ok_pr, previewers = pcall(require, "telescope.previewers")
   if not (ok_p and ok_f and ok_c and ok_a and ok_as and ok_pr) then return end
 
-  -- Build combined entry list
   local function make_entries()
     local entries = {}
-
-    -- Active (running) jobs
     for _, j in ipairs(runner.active_jobs()) do
       table.insert(entries, {
-        kind    = "running",
-        label   = j.label,
-        display = "  " .. j.label,
-        lines   = nil,    -- read from terminal buf live
-        buf     = j.buf,
-        job_id  = j.job_id,
-        status  = "running",
-        time    = "",
+        kind   = "running",
+        label  = j.label,
+        buf    = j.buf,
+        job_id = j.job_id,
+        status = "running",
+        time   = "",
+        lines  = nil,
       })
     end
-
-    -- Completed (log) — newest first
     local log = runner.job_log()
     for i = #log, 1, -1 do
       local l = log[i]
-      local icon = l.status == "ok" and " " or " "
       table.insert(entries, {
         kind    = "log",
         label   = l.label,
-        display = icon .. "[" .. l.time .. "] " .. l.label,
-        lines   = l.lines,
         buf     = nil,
         job_id  = nil,
         status  = l.status,
         time    = l.time,
+        lines   = l.lines,
         log_idx = i,
       })
     end
-
     return entries
   end
 
@@ -65,20 +93,8 @@ function M.open()
     title = "Output",
     define_preview = function(self, entry)
       local pbuf  = self.state.bufnr
-      local lines = {}
-      if entry.value.buf and vim.api.nvim_buf_is_valid(entry.value.buf) then
-        -- terminal buffer — grab last 300 lines
-        local n = vim.api.nvim_buf_line_count(entry.value.buf)
-        lines   = vim.api.nvim_buf_get_lines(entry.value.buf, math.max(0, n - 300), n, false)
-      elseif entry.value.lines then
-        lines = entry.value.lines
-      else
-        lines = { "(no output captured)" }
-      end
-      -- strip empty trailing lines
-      while #lines > 0 and vim.trim(lines[#lines]) == "" do
-        table.remove(lines)
-      end
+      local lines = get_lines(entry.value)
+      while #lines > 0 and vim.trim(lines[#lines]) == "" do table.remove(lines) end
       vim.api.nvim_buf_set_lines(pbuf, 0, -1, false, lines)
       vim.bo[pbuf].filetype = "log"
       local pwin = self.state.winid
@@ -89,13 +105,16 @@ function M.open()
   })
 
   pickers.new({}, {
-    prompt_title = " Dotnet Jobs  [<CR>=stop/dismiss  <C-x>=clear log]",
+    prompt_title = " Dotnet Jobs  [<CR>=open log  <C-s>=stop  <C-x>=clear]",
     finder = finders.new_table({
       results     = entries,
       entry_maker = function(e)
+        local icon = e.kind == "running" and "  "
+                  or (e.status == "ok" and " " or " ")
+        local time = e.time ~= "" and ("[" .. e.time .. "] ") or ""
         return {
           value   = e,
-          display = e.display,
+          display = icon .. time .. e.label,
           ordinal = e.label,
         }
       end,
@@ -103,8 +122,19 @@ function M.open()
     sorter    = conf.values.generic_sorter({}),
     previewer = previewer,
     attach_mappings = function(prompt_bufnr, map)
-      -- Enter: stop running job, or dismiss completed entry
+      -- CR: open full log in a split
       actions.select_default:replace(function()
+        local sel = act_state.get_selected_entry()
+        actions.close(prompt_bufnr)
+        if not sel then return end
+        local e     = sel.value
+        local lines = get_lines(e)
+        while #lines > 0 and vim.trim(lines[#lines]) == "" do table.remove(lines) end
+        open_log_buf(lines, e.label)
+      end)
+
+      -- C-s: stop running job (without opening log)
+      map({ "i", "n" }, "<C-s>", function()
         local sel = act_state.get_selected_entry()
         actions.close(prompt_bufnr)
         if not sel then return end
@@ -113,10 +143,9 @@ function M.open()
           runner.stop(e.job_id)
           vim.notify("[dotnet] Stopped: " .. e.label, vim.log.levels.INFO)
         end
-        -- for log entries: just closes (dismissed)
       end)
 
-      -- C-x: clear all finished logs
+      -- C-x: clear finished log
       map({ "i", "n" }, "<C-x>", function()
         actions.close(prompt_bufnr)
         runner.clear_log()
