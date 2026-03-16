@@ -60,7 +60,15 @@ function M.bg(args, opts)
       vim.schedule(function()
         untrack(id)
         if code ~= 0 then
-          local msg = table.concat(stderr, "\n"):gsub("\n+$", "")
+          -- dotnet build writes errors to stdout; show both
+          local all_out = vim.list_extend(vim.deepcopy(stdout), stderr)
+          -- keep only non-empty lines and cap to last 30 to avoid huge notifications
+          local err_lines = {}
+          for _, l in ipairs(all_out) do
+            if vim.trim(l) ~= "" then table.insert(err_lines, l) end
+          end
+          local tail = #err_lines > 30 and vim.list_slice(err_lines, #err_lines - 29) or err_lines
+          local msg  = table.concat(tail, "\n")
           vim.notify("[dotnet] " .. label .. " failed\n" .. msg, vim.log.levels.ERROR)
         else
           if opts.notify_success ~= false then
@@ -186,29 +194,35 @@ end
 
 function M.build(target, opts)
   opts = opts or {}
-  return M.bg({ "dotnet", "build", target },
-    vim.tbl_extend("force", opts, { label = "Build " .. vim.fn.fnamemodify(target, ":t") }))
+  return M.bg({ "dotnet", "build", target }, vim.tbl_extend("force", {
+    cwd   = vim.fn.fnamemodify(target, ":h"),
+    label = "Build " .. vim.fn.fnamemodify(target, ":t"),
+  }, opts))
 end
 
 function M.build_qf(target, opts)
   opts = opts or {}
-  return M.bg({ "dotnet", "build", target },
-    vim.tbl_extend("force", opts, {
-      label    = "Build " .. vim.fn.fnamemodify(target, ":t"),
-      quickfix = true,
-    }))
+  return M.bg({ "dotnet", "build", target }, vim.tbl_extend("force", {
+    cwd      = vim.fn.fnamemodify(target, ":h"),
+    label    = "Build " .. vim.fn.fnamemodify(target, ":t"),
+    quickfix = true,
+  }, opts))
 end
 
 function M.restore(target, opts)
   opts = opts or {}
-  return M.bg({ "dotnet", "restore", target },
-    vim.tbl_extend("force", opts, { label = "Restore" }))
+  return M.bg({ "dotnet", "restore", target }, vim.tbl_extend("force", {
+    cwd   = vim.fn.fnamemodify(target, ":h"),
+    label = "Restore",
+  }, opts))
 end
 
 function M.clean(target, opts)
   opts = opts or {}
-  return M.bg({ "dotnet", "clean", target },
-    vim.tbl_extend("force", opts, { label = "Clean" }))
+  return M.bg({ "dotnet", "clean", target }, vim.tbl_extend("force", {
+    cwd   = vim.fn.fnamemodify(target, ":h"),
+    label = "Clean",
+  }, opts))
 end
 
 function M.run(proj_path, opts)
