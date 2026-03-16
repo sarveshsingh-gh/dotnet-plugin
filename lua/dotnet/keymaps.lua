@@ -12,6 +12,7 @@ function M.setup(km)
   local dotnet = require("dotnet")
 
   bind(km.palette,         function() require("dotnet.ui.palette").open() end,               "Dotnet command palette")
+  bind(km.find_file,       function() require("dotnet.telescope.files").open() end,          "Dotnet find file in solution")
   bind(km.explorer_toggle, function() require("dotnet.ui.explorer").toggle() end,            "Dotnet explorer toggle")
   bind(km.explorer_reveal, function() require("dotnet.ui.explorer").reveal() end,            "Dotnet explorer reveal file")
   bind(km.new_item,        function() require("dotnet.commands.init").run("file.new_item") end, "Dotnet new item")

@@ -142,7 +142,7 @@ end
 -- Register commands
 cmd.register("nuget.add", {
   category = "nuget",
-  icon     = " ",
+  icon     = "󰐗 ",
   desc     = "Add NuGet package",
   run      = function()
     picker.project({}, function(proj)
@@ -153,7 +153,7 @@ cmd.register("nuget.add", {
 
 cmd.register("nuget.remove", {
   category = "nuget",
-  icon     = " ",
+  icon     = "󰐘 ",
   desc     = "Remove NuGet package",
   run      = function()
     picker.project({}, function(proj)

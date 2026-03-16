@@ -46,24 +46,39 @@ function M.get(id) return _registry[id] end
 --- Annotate commands with their keybindings from the resolved config keymaps.
 function M.annotate_keys(km)
   local map = {
-    ["build.solution"]     = km.build_solution,
-    ["build.quickfix"]     = km.build_quickfix,
-    ["build.restore"]      = km.restore,
-    ["build.clean"]        = km.clean,
-    ["build.rebuild"]      = km.rebuild,
-    ["run.project"]        = km.run_project,
-    ["run.watch"]          = km.watch,
-    ["run.stop_all"]       = km.stop_all,
-    ["test.solution"]      = km.test_solution,
-    ["test.project"]       = km.test_project,
-    ["file.new_item"]      = km.new_item,
-    ["file.fix_namespace"] = km.fix_namespace,
-    ["explorer.toggle"]    = km.explorer_toggle,
-    ["explorer.reveal"]    = km.explorer_reveal,
+    -- build
+    ["build.solution"]       = km.build_solution,
+    ["build.quickfix"]       = km.build_quickfix,
+    ["build.restore"]        = km.restore,
+    ["build.clean"]          = km.clean,
+    ["build.rebuild"]        = km.rebuild,
+    -- run
+    ["run.project"]          = km.run_project,
+    ["run.watch"]            = km.watch,
+    ["run.stop_all"]         = km.stop_all,
+    -- test
+    ["test.solution"]        = km.test_solution,
+    ["test.project"]         = km.test_project,
+    -- file
+    ["file.new_item"]        = km.new_item,
+    ["file.fix_namespace"]   = km.fix_namespace,
+    ["files.find"]           = km.find_file,
+    -- explorer
+    ["explorer.toggle"]      = km.explorer_toggle,
+    ["explorer.reveal"]      = km.explorer_reveal,
     ["test_explorer.toggle"] = km.test_explorer,
-    ["jobs.list"]          = km.list_jobs,
-    ["nuget.add"]          = km.nuget_add,
-    ["nuget.remove"]       = km.nuget_remove,
+    -- misc
+    ["jobs.list"]            = km.list_jobs,
+    ["nuget.add"]            = km.nuget_add,
+    ["nuget.remove"]         = km.nuget_remove,
+    -- debug F-keys (hardcoded — set in keymaps.lua)
+    ["debug.continue"]       = "<F5>",
+    ["debug.stop"]           = "<S-F5>",
+    ["debug.step_over"]      = "<F10>",
+    ["debug.step_into"]      = "<F11>",
+    ["debug.step_out"]       = "<S-F11>",
+    ["debug.breakpoint"]     = "<F9>",
+    ["debug.eval"]           = "<S-F9>",
   }
   for id, key in pairs(map) do
     if _registry[id] and key then _registry[id].key = key end

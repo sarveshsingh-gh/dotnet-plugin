@@ -51,6 +51,7 @@ M.defaults = {
 
   keymaps = {
     palette          = "<M-S-p>",
+    find_file        = "<leader>nf",
     explorer_toggle  = "<leader>ne",
     explorer_reveal  = "<leader>nE",
     new_item         = "<leader>nn",
