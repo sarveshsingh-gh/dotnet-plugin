@@ -63,6 +63,8 @@ function M.bg(args, opts)
   local label   = opts.label or table.concat(args, " ")
   local stdout  = {}
   local stderr  = {}
+  local notify  = require("dotnet.notify")
+  local spin_id = notify.start_spinner(label)
 
   local job_id = vim.fn.jobstart(args, {
     cwd        = opts.cwd,
@@ -72,14 +74,15 @@ function M.bg(args, opts)
     on_stderr  = function(_, data) vim.list_extend(stderr, data) end,
     on_exit    = function(id, code)
       vim.schedule(function()
+        notify.stop_spinner(spin_id)
         local all_out = vim.list_extend(vim.deepcopy(stdout), stderr)
         local status  = code == 0 and "ok" or "failed"
         untrack(id, status, all_out)
         if code ~= 0 then
-          require("dotnet.notify").error("" .. label .. " failed — press gx to see log")
+          notify.error(label .. " failed — press gx to see log")
         else
           if opts.notify_success ~= false then
-            require("dotnet.notify").info("" .. label .. " succeeded")
+            notify.info(label .. " succeeded")
           end
         end
 
@@ -90,7 +93,7 @@ function M.bg(args, opts)
           vim.fn.setqflist({}, "r", { title = label, items = qf })
           if #qf > 0 then
             vim.cmd("copen")
-            require("dotnet.notify").warn("" .. #qf .. " issue(s) → quickfix")
+            require("dotnet.notify").warn(#qf .. " issue(s) → quickfix")
           end
         end
 
