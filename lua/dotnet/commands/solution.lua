@@ -5,7 +5,7 @@ local picker   = require("dotnet.ui.picker")
 local function reg(id, def) cmd.register(id, vim.tbl_extend("force", { category = "solution" }, def)) end
 
 reg("solution.add_project", {
-  icon = " ",
+  icon = "󰐗 ",
   desc = "Add project to solution",
   run  = function()
     picker.solution(function(sln)
@@ -19,7 +19,7 @@ reg("solution.add_project", {
 })
 
 reg("solution.remove_project", {
-  icon = " ",
+  icon = "󰐘 ",
   desc = "Remove project from solution",
   run  = function()
     picker.project({ prompt = "Remove project:" }, function(proj, sln)
@@ -34,7 +34,7 @@ reg("solution.remove_project", {
 })
 
 reg("solution.new_project", {
-  icon = " ",
+  icon = "󰏗 ",
   desc = "New project",
   run  = function()
     -- Templates list; user picks, then provides name + path

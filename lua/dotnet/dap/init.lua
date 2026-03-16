@@ -133,19 +133,19 @@ function M.setup(cfg)
 
   -- ── Register debug commands in palette ──────────────────────────────────────
   local cmd = require("dotnet.commands.init")
-  cmd.register("debug.continue",    { category="debug", icon=" ",  desc="Continue / Start",      run = function() dap.continue() end })
+  cmd.register("debug.continue",    { category="debug", icon="󰐊 ", desc="Continue / Start",      run = function() dap.continue() end })
   cmd.register("debug.stop",        { category="debug", icon="󰓛 ", desc="Stop",                   run = function() dap.terminate() end })
   cmd.register("debug.step_over",   { category="debug", icon="󰆷 ", desc="Step Over",              run = function() dap.step_over() end })
   cmd.register("debug.step_into",   { category="debug", icon="󰆹 ", desc="Step Into",              run = function() dap.step_into() end })
   cmd.register("debug.step_out",    { category="debug", icon="󰆸 ", desc="Step Out",               run = function() dap.step_out() end })
-  cmd.register("debug.breakpoint",  { category="debug", icon="● ", desc="Toggle Breakpoint",      run = function() dap.toggle_breakpoint() end })
-  cmd.register("debug.bp_cond",     { category="debug", icon="◆ ", desc="Conditional Breakpoint", run = function()
+  cmd.register("debug.breakpoint",  { category="debug", icon="󰝤 ", desc="Toggle Breakpoint",      run = function() dap.toggle_breakpoint() end })
+  cmd.register("debug.bp_cond",     { category="debug", icon="󰟃 ", desc="Conditional Breakpoint", run = function()
     dap.set_breakpoint(vim.fn.input("Condition: "))
   end })
   cmd.register("debug.clear_bps",  { category="debug", icon="󰅙 ", desc="Clear All Breakpoints",  run = function() dap.clear_breakpoints() end })
   if ok_ui then
     cmd.register("debug.ui_toggle", { category="debug", icon="󰙀 ", desc="Toggle Debug UI",        run = function() dapui.toggle() end })
-    cmd.register("debug.eval",      { category="debug", icon=" ", desc="Evaluate Expression",    run = function() dapui.eval() end })
+    cmd.register("debug.eval",      { category="debug", icon="󰃧 ", desc="Evaluate Expression",    run = function() dapui.eval() end })
   end
 end
 

@@ -5,7 +5,7 @@ local picker = require("dotnet.ui.picker")
 local function reg(id, def) cmd.register(id, vim.tbl_extend("force", { category = "run" }, def)) end
 
 reg("run.project", {
-  icon = " ",
+  icon = "󰐊 ",
   desc = "Run project",
   run  = function()
     picker.runnable({ prompt = "Run project:" }, function(proj)
@@ -15,7 +15,7 @@ reg("run.project", {
 })
 
 reg("run.profile", {
-  icon = " ",
+  icon = "󰐊 ",
   desc = "Run project with launch profile",
   run  = function()
     picker.runnable({ prompt = "Run project (profile):" }, function(proj)

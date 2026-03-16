@@ -25,7 +25,7 @@ function M.setup(user_opts)
   })
   cmd.register("files.find", {
     category = "file",
-    icon     = " ",
+    icon     = "󰱼 ",
     desc     = "Find file in solution",
     run      = function() require("dotnet.telescope.files").open() end,
   })
@@ -51,8 +51,9 @@ function M.setup(user_opts)
   -- DAP setup
   require("dotnet.dap.init").setup(_cfg.dap)
 
-  -- Keymaps
+  -- Keymaps + annotate palette entries with their bindings
   require("dotnet.keymaps").setup(_cfg.keymaps)
+  require("dotnet.commands.init").annotate_keys(_cfg.keymaps)
 
   -- :Dotnet and :D commands
   local palette_cmd = (_cfg.palette or {}).cmd or "Dotnet"

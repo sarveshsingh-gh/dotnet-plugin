@@ -41,4 +41,33 @@ function M.for_category(cat)
   return vim.tbl_filter(function(c) return c.category == cat end, M.all())
 end
 
+function M.get(id) return _registry[id] end
+
+--- Annotate commands with their keybindings from the resolved config keymaps.
+function M.annotate_keys(km)
+  local map = {
+    ["build.solution"]     = km.build_solution,
+    ["build.quickfix"]     = km.build_quickfix,
+    ["build.restore"]      = km.restore,
+    ["build.clean"]        = km.clean,
+    ["build.rebuild"]      = km.rebuild,
+    ["run.project"]        = km.run_project,
+    ["run.watch"]          = km.watch,
+    ["run.stop_all"]       = km.stop_all,
+    ["test.solution"]      = km.test_solution,
+    ["test.project"]       = km.test_project,
+    ["file.new_item"]      = km.new_item,
+    ["file.fix_namespace"] = km.fix_namespace,
+    ["explorer.toggle"]    = km.explorer_toggle,
+    ["explorer.reveal"]    = km.explorer_reveal,
+    ["test_explorer.toggle"] = km.test_explorer,
+    ["jobs.list"]          = km.list_jobs,
+    ["nuget.add"]          = km.nuget_add,
+    ["nuget.remove"]       = km.nuget_remove,
+  }
+  for id, key in pairs(map) do
+    if _registry[id] and key then _registry[id].key = key end
+  end
+end
+
 return M

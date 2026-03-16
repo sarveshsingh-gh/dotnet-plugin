@@ -26,8 +26,8 @@ function M.open(opts)
     finder = finders.new_table({
       results     = cmds,
       entry_maker = function(c)
-        local left  = string.format("%-2s%-28s", c.icon or "  ", c.desc)
-        local tag   = "[" .. (c.category or "") .. "]"
+        local left  = string.format("%-2s%-30s", c.icon or "  ", c.desc)
+        local tag   = c.key or ""
         local full  = left .. "  " .. tag
         local hl_start = #left + 2
         return {
@@ -37,7 +37,7 @@ function M.open(opts)
               { { hl_start, hl_start + #tag }, "Comment" },
             }
           end,
-          ordinal = c.category .. " " .. c.desc,
+          ordinal = (c.category or "") .. " " .. c.desc,
         }
       end,
     }),

@@ -85,7 +85,7 @@ local function do_new_item(proj_path, target_dir)
 end
 
 reg("file.new_item", {
-  icon = " ",
+  icon = "󰝒 ",
   desc = "New item (class, interface, etc.)",
   run  = function()
     picker.project({ prompt = "New item in project:" }, function(proj)
@@ -95,7 +95,7 @@ reg("file.new_item", {
 })
 
 reg("file.fix_namespace", {
-  icon = " ",
+  icon = "󰏫 ",
   desc = "Fix namespace of current file",
   run  = function()
     local file_path = vim.api.nvim_buf_get_name(0)
