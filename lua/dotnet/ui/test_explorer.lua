@@ -604,6 +604,13 @@ local function setup_keymaps()
     end
   end)
 
+  -- Debug test project under cursor
+  map("d", function()
+    local node = cursor_node()
+    if not node or not node.proj then return end
+    require("dotnet.dap.init").debug_test_project(node.proj)
+  end)
+
   -- Refresh discovery
   map("e", function() refresh() end)
   map("<F5>", function()

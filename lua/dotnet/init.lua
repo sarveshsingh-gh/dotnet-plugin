@@ -145,106 +145,11 @@ function M.setup(user_opts)
         })
       end, { buffer = ev.buf, desc = "Run test project" })
 
-      -- dt: debug tests via DAP (VSTEST_HOST_DEBUG=1 attach approach)
+      -- dt: debug tests via DAP
       vim.keymap.set("n", "dt", function()
-        local ok2, err = pcall(function()
-          local proj = proj_for_buf()
-          if not proj then require("dotnet.notify").warn("Not in a dotnet project"); return end
-          local ok, dap = pcall(require, "dap")
-          if not ok then require("dotnet.notify").warn("nvim-dap not available"); return end
-          local proj_dir = vim.fn.fnamemodify(proj, ":h")
-          local name     = vim.fn.fnamemodify(proj, ":t:r")
-          -- Start dotnet test with VSTEST_HOST_DEBUG=1 — vstest host prints its PID
-          -- and waits for a debugger to attach, then continues running tests.
-          local notify = require("dotnet.notify")
-          local spin   = notify.start_spinner("Waiting for test host…")
-          local attached = false
-          vim.fn.jobstart({ "dotnet", "test", proj, "--no-build" }, {
-            cwd = proj_dir,
-            env = vim.tbl_extend("force", vim.fn.environ(), { VSTEST_HOST_DEBUG = "1" }),
-            stdout_buffered = false,
-            stderr_buffered = false,
-            on_stdout = function(_, data)
-              for _, line in ipairs(data or {}) do
-                local pid = line:match("[Pp]rocess[Ii][Dd]%s*:%s*(%d+)")
-                         or line:match("[Pp]rocess[%s_][Ii][Dd][%s:=]+(%d+)")
-                         or line:match("PID[%s:=]+(%d+)")
-                if pid and not attached then
-                  attached = true
-                  vim.schedule(function()
-                    notify.stop_spinner(spin)
-                    -- After debug session ends, run TRX test pass for visual ticks
-                    local trx_key = "dt_trx_" .. tostring(ev.buf)
-                    dap.listeners.before["event_terminated"][trx_key] = function()
-                      dap.listeners.before["event_terminated"][trx_key] = nil
-                      vim.schedule(function()
-                        local results_dir = vim.fn.tempname()
-                        vim.fn.mkdir(results_dir, "p")
-                        local signs = require("dotnet.ui.test_signs")
-                        signs.mark_running(proj)
-                        vim.fn.jobstart({ "dotnet", "test", "--nologo", "--no-build",
-                                          "--logger", "trx", "--results-directory", results_dir, proj }, {
-                          cwd = proj_dir,
-                          on_exit = function(_, _code)
-                            vim.schedule(function()
-                              local trx = vim.fn.glob(results_dir .. "/*.trx", false, true)
-                              local results = {}
-                              if trx and #trx > 0 then
-                                local ok3, lines = pcall(vim.fn.readfile, trx[1])
-                                vim.fn.delete(results_dir, "rf")
-                                if ok3 then
-                                  local id_to_fqn = {}
-                                  local cur_id = nil
-                                  for _, l in ipairs(lines) do
-                                    local id = l:match('<UnitTest[^>]+%sid="([^"]+)"')
-                                    if id then cur_id = id end
-                                    if cur_id then
-                                      local cls  = l:match('className="([^"]+)"')
-                                      local meth = l:match('<TestMethod[^>]+%sname="([^"]+)"')
-                                      if cls and meth then id_to_fqn[cur_id] = cls .. "." .. meth; cur_id = nil end
-                                    end
-                                  end
-                                  for _, l in ipairs(lines) do
-                                    if l:find("UnitTestResult") and l:find('testId=') and l:find('outcome=') then
-                                      local tid = l:match('testId="([^"]+)"')
-                                      local out = l:match('outcome="([^"]+)"')
-                                      if tid and out and id_to_fqn[tid] then
-                                        local st = out:lower()
-                                        results[id_to_fqn[tid]] = st == "notexecuted" and "skipped" or st
-                                      end
-                                    end
-                                  end
-                                end
-                              else
-                                vim.fn.delete(results_dir, "rf")
-                              end
-                              signs.annotate(results)
-                            end)
-                          end,
-                        })
-                      end)
-                    end
-                    dap.run({
-                      type      = "coreclr",
-                      name      = "Debug Tests: " .. name,
-                      request   = "attach",
-                      processId = tonumber(pid),
-                    })
-                  end)
-                end
-              end
-            end,
-            on_exit = function(_, _code)
-              vim.schedule(function()
-                notify.stop_spinner(spin)
-                if not attached then
-                  notify.warn("Test host did not print a PID — try building first with 't'")
-                end
-              end)
-            end,
-          })
-        end)
-        if not ok2 then require("dotnet.notify").error("dt: " .. tostring(err)) end
+        local proj = proj_for_buf()
+        if not proj then require("dotnet.notify").warn("Not in a dotnet project"); return end
+        require("dotnet.dap.init").debug_test_project(proj)
       end, { buffer = ev.buf, desc = "Debug test project" })
     end,
   })

@@ -1,6 +1,93 @@
 -- DAP + DAP-UI setup for .NET / netcoredbg.
 local M = {}
 
+--- Debug a test project using VSTEST_HOST_DEBUG=1 attach approach.
+--- Can be called from test explorer or buffer keymaps.
+function M.debug_test_project(proj_path)
+  local ok, dap = pcall(require, "dap")
+  if not ok then require("dotnet.notify").warn("nvim-dap not available"); return end
+  local notify  = require("dotnet.notify")
+  local proj_dir = vim.fn.fnamemodify(proj_path, ":h")
+  local name     = vim.fn.fnamemodify(proj_path, ":t:r")
+  local spin     = notify.start_spinner("Waiting for test host…")
+  local attached = false
+  vim.fn.jobstart({ "dotnet", "test", proj_path, "--no-build" }, {
+    cwd = proj_dir,
+    env = vim.tbl_extend("force", vim.fn.environ(), { VSTEST_HOST_DEBUG = "1" }),
+    stdout_buffered = false,
+    stderr_buffered = false,
+    on_stdout = function(_, data)
+      for _, line in ipairs(data or {}) do
+        local pid = line:match("[Pp]rocess[Ii][Dd]%s*:%s*(%d+)")
+                 or line:match("[Pp]rocess[%s_][Ii][Dd][%s:=]+(%d+)")
+                 or line:match("PID[%s:=]+(%d+)")
+        if pid and not attached then
+          attached = true
+          vim.schedule(function()
+            notify.stop_spinner(spin)
+            local trx_key = "dt_trx_" .. proj_path
+            dap.listeners.before["event_terminated"][trx_key] = function()
+              dap.listeners.before["event_terminated"][trx_key] = nil
+              vim.schedule(function()
+                local results_dir = vim.fn.tempname()
+                vim.fn.mkdir(results_dir, "p")
+                local signs = require("dotnet.ui.test_signs")
+                signs.mark_running(proj_path)
+                vim.fn.jobstart({ "dotnet", "test", "--nologo", "--no-build",
+                                  "--logger", "trx", "--results-directory", results_dir, proj_path }, {
+                  cwd = proj_dir,
+                  on_exit = function(_, _code)
+                    vim.schedule(function()
+                      local trx = vim.fn.glob(results_dir .. "/*.trx", false, true)
+                      local results = {}
+                      if trx and #trx > 0 then
+                        local ok3, lines = pcall(vim.fn.readfile, trx[1])
+                        vim.fn.delete(results_dir, "rf")
+                        if ok3 then
+                          local id_to_fqn, cur_id = {}, nil
+                          for _, l in ipairs(lines) do
+                            local id = l:match('<UnitTest[^>]+%sid="([^"]+)"')
+                            if id then cur_id = id end
+                            if cur_id then
+                              local cls  = l:match('className="([^"]+)"')
+                              local meth = l:match('<TestMethod[^>]+%sname="([^"]+)"')
+                              if cls and meth then id_to_fqn[cur_id] = cls .. "." .. meth; cur_id = nil end
+                            end
+                          end
+                          for _, l in ipairs(lines) do
+                            if l:find("UnitTestResult") and l:find('testId=') and l:find('outcome=') then
+                              local tid = l:match('testId="([^"]+)"')
+                              local out = l:match('outcome="([^"]+)"')
+                              if tid and out and id_to_fqn[tid] then
+                                local st = out:lower()
+                                results[id_to_fqn[tid]] = st == "notexecuted" and "skipped" or st
+                              end
+                            end
+                          end
+                        end
+                      else
+                        vim.fn.delete(results_dir, "rf")
+                      end
+                      signs.annotate(results)
+                    end)
+                  end,
+                })
+              end)
+            end
+            dap.run({ type = "coreclr", name = "Debug Tests: " .. name, request = "attach", processId = tonumber(pid) })
+          end)
+        end
+      end
+    end,
+    on_exit = function(_, _code)
+      vim.schedule(function()
+        notify.stop_spinner(spin)
+        if not attached then notify.warn("Test host did not print a PID — try building first") end
+      end)
+    end,
+  })
+end
+
 function M.setup(cfg)
   cfg = cfg or {}
 
