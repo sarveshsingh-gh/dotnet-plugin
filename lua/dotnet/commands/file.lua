@@ -1,0 +1,132 @@
+local cmd       = require("dotnet.commands.init")
+local namespace = require("dotnet.core.namespace")
+local solution  = require("dotnet.core.solution")
+local project   = require("dotnet.core.project")
+local picker    = require("dotnet.ui.picker")
+
+local function reg(id, def) cmd.register(id, vim.tbl_extend("force", { category = "file" }, def)) end
+
+local TEMPLATES = {
+  { value = "class",          display = "Class",                   ext = ".cs"     },
+  { value = "interface",      display = "Interface",               ext = ".cs"     },
+  { value = "record",         display = "Record",                  ext = ".cs"     },
+  { value = "struct",         display = "Struct",                  ext = ".cs"     },
+  { value = "enum",           display = "Enum",                    ext = ".cs"     },
+  { value = "apicontroller",  display = "API Controller",          ext = ".cs"     },
+  { value = "mvccontroller",  display = "MVC Controller",          ext = ".cs"     },
+  { value = "razorcomponent", display = "Razor Component",         ext = ".razor"  },
+  { value = "page",           display = "Razor Page",              ext = ".cshtml" },
+  { value = "view",           display = "Razor View",              ext = ".cshtml" },
+  { value = "nunit-test",     display = "NUnit Test",              ext = ".cs"     },
+  { value = "buildprops",     display = "Directory.Build.props",   predefined = "Directory.Build.props"    },
+  { value = "packagesprops",  display = "Directory.Packages.props",predefined = "Directory.Packages.props" },
+  { value = "gitignore",      display = ".gitignore",              predefined = ".gitignore"   },
+  { value = "editorconfig",   display = ".editorconfig",           predefined = ".editorconfig" },
+  { value = "globaljson",     display = "global.json",             predefined = "global.json"  },
+  { value = "nugetconfig",    display = "nuget.config",            predefined = "nuget.config" },
+}
+
+local function do_new_item(proj_path, target_dir)
+  local proj_dir = vim.fn.fnamemodify(proj_path, ":h")
+  local out_dir  = target_dir or proj_dir
+
+  vim.ui.select(TEMPLATES, {
+    prompt      = "New item (" .. vim.fn.fnamemodify(proj_path, ":t:r") .. "):",
+    format_item = function(t) return t.display end,
+  }, function(tpl)
+    if not tpl then return end
+
+    local function run(name)
+      local dest_abs, o_flag, file_path
+      if tpl.predefined then
+        dest_abs  = out_dir
+        o_flag    = out_dir
+        file_path = out_dir .. "/" .. tpl.predefined
+      else
+        local sub  = name:match("^(.+)/[^/]+$")
+        local base = name:match("([^/]+)$")
+        dest_abs   = sub and (out_dir .. "/" .. sub) or out_dir
+        vim.fn.mkdir(dest_abs, "p")
+        local rel  = dest_abs:sub(#proj_dir + 2)
+        o_flag     = rel ~= "" and rel or "."
+        file_path  = dest_abs .. "/" .. base .. tpl.ext
+        name       = base
+      end
+
+      local stderr = {}
+      local args   = tpl.predefined
+        and { "dotnet", "new", tpl.value, "-o", o_flag }
+        or  { "dotnet", "new", tpl.value, "-o", o_flag, "-n", name }
+
+      vim.fn.jobstart(args, {
+        cwd       = proj_dir,
+        on_stderr = function(_, d) for _, l in ipairs(d) do if l ~= "" then table.insert(stderr, l) end end end,
+        on_exit   = function(_, code)
+          vim.schedule(function()
+            if code ~= 0 then
+              vim.notify("[dotnet] new item failed:\n" .. table.concat(stderr, "\n"), vim.log.levels.ERROR)
+              return
+            end
+            -- Fix namespace for .cs files
+            if tpl.ext == ".cs" and vim.fn.filereadable(file_path) == 1 then
+              local ns = namespace.compute(proj_path, file_path)
+              namespace.patch_file(file_path, ns)
+            end
+            -- Open the file
+            if vim.fn.filereadable(file_path) == 1 then
+              vim.cmd("edit " .. vim.fn.fnameescape(file_path))
+            end
+          end)
+        end,
+      })
+    end
+
+    if tpl.predefined then
+      run(nil)
+    else
+      vim.ui.input({ prompt = "Name (e.g. MyClass or Sub/MyClass): " }, function(name)
+        if name and name ~= "" then run(name) end
+      end)
+    end
+  end)
+end
+
+reg("file.new_item", {
+  icon = " ",
+  desc = "New item (class, interface, etc.)",
+  run  = function()
+    picker.project({ prompt = "New item in project:" }, function(proj)
+      do_new_item(proj)
+    end)
+  end,
+})
+
+reg("file.fix_namespace", {
+  icon = " ",
+  desc = "Fix namespace of current file",
+  run  = function()
+    local file_path = vim.api.nvim_buf_get_name(0)
+    if not file_path:match("%.cs$") then
+      vim.notify("[dotnet] Not a .cs file", vim.log.levels.WARN)
+      return
+    end
+    local sln = solution.find()
+    if not sln then return end
+    local projs = solution.projects(sln)
+    local proj  = project.owner(file_path, projs)
+    if not proj then
+      vim.notify("[dotnet] File not in any project", vim.log.levels.WARN)
+      return
+    end
+    local ns = namespace.compute(proj, file_path)
+    if namespace.patch_buf(0, ns) then
+      vim.notify("[dotnet] Namespace → " .. ns, vim.log.levels.INFO)
+    else
+      vim.notify("[dotnet] No namespace declaration found", vim.log.levels.WARN)
+    end
+  end,
+})
+
+-- Expose do_new_item for solution explorer to call directly with context
+M = require("dotnet.commands.init")
+M.new_item = do_new_item

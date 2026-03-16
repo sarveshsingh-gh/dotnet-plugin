@@ -1,0 +1,247 @@
+-- Async dotnet CLI runner with job tracking.
+-- bg()   → background job (build/test/restore) — no window, notify on done
+-- term() → terminal job  (run/watch)            — opens a terminal buffer
+local M = {}
+
+local _jobs = {}   -- [job_id] = { label, buf, pid, cmd }
+
+-- ── Helpers ──────────────────────────────────────────────────────────────────
+
+local function read_cmdline(pid)
+  local f = io.open("/proc/" .. tostring(pid) .. "/cmdline", "r")
+  if not f then return nil end
+  local s = f:read("*a"); f:close()
+  return s:gsub("%z", " "):gsub("%s+$", "")
+end
+
+local function untrack(job_id)
+  _jobs[job_id] = nil
+end
+
+-- ── Quickfix parser ───────────────────────────────────────────────────────────
+-- Parses dotnet build/test stdout into a quickfix list.
+-- Pattern: /path/file.cs(line,col): error|warning CSxxxx: message
+local QF_PATTERN = "^(.-)%((%d+),(%d+)%):%s+(%a+)%s+(CS%d+):%s+(.+)$"
+
+local function parse_qf(lines)
+  local items = {}
+  for _, l in ipairs(lines) do
+    local file, row, col, severity, code, msg = l:match(QF_PATTERN)
+    if file then
+      table.insert(items, {
+        filename = vim.trim(file),
+        lnum     = tonumber(row),
+        col      = tonumber(col),
+        type     = severity:sub(1,1):upper(),  -- E / W
+        text     = code .. ": " .. msg,
+      })
+    end
+  end
+  return items
+end
+
+-- ── Background job ────────────────────────────────────────────────────────────
+
+--- Run a dotnet command in background (no terminal window).
+-- opts: { cwd, label, quickfix, on_exit }
+function M.bg(args, opts)
+  opts = opts or {}
+  local label   = opts.label or table.concat(args, " ")
+  local stdout  = {}
+  local stderr  = {}
+
+  local job_id = vim.fn.jobstart(args, {
+    cwd        = opts.cwd,
+    stdout_buffered = true,
+    stderr_buffered = true,
+    on_stdout  = function(_, data) vim.list_extend(stdout, data) end,
+    on_stderr  = function(_, data) vim.list_extend(stderr, data) end,
+    on_exit    = function(id, code)
+      vim.schedule(function()
+        untrack(id)
+        if code ~= 0 then
+          local msg = table.concat(stderr, "\n"):gsub("\n+$", "")
+          vim.notify("[dotnet] " .. label .. " failed\n" .. msg, vim.log.levels.ERROR)
+        else
+          if opts.notify_success ~= false then
+            vim.notify("[dotnet] " .. label .. " succeeded", vim.log.levels.INFO)
+          end
+        end
+
+        -- Populate quickfix if requested
+        if opts.quickfix then
+          local all = vim.list_extend(vim.deepcopy(stdout), stderr)
+          local qf  = parse_qf(all)
+          vim.fn.setqflist({}, "r", { title = label, items = qf })
+          if #qf > 0 then
+            vim.cmd("copen")
+            vim.notify("[dotnet] " .. #qf .. " issue(s) → quickfix", vim.log.levels.WARN)
+          end
+        end
+
+        if opts.on_exit then opts.on_exit(code, stdout, stderr) end
+      end)
+    end,
+  })
+
+  if job_id > 0 then
+    local ok, pid = pcall(vim.fn.jobpid, job_id)
+    _jobs[job_id] = { label = label, buf = nil, pid = ok and pid or nil, cmd = args }
+  end
+
+  return job_id
+end
+
+-- ── Terminal job ──────────────────────────────────────────────────────────────
+
+--- Run a dotnet command in a terminal buffer (run / watch).
+-- opts: { cwd, label, direction, size, on_exit }
+function M.term(args, opts)
+  opts = opts or {}
+  local label     = opts.label or table.concat(args, " ")
+  local direction = opts.direction or "botright"
+  local size      = opts.size or 15
+
+  -- Reuse existing window or open new split
+  local saved = vim.api.nvim_get_current_win()
+  vim.cmd(direction .. " " .. size .. "split")
+  local win = vim.api.nvim_get_current_win()
+
+  local buf  = vim.api.nvim_create_buf(false, true)
+  vim.api.nvim_win_set_buf(win, buf)
+  vim.api.nvim_set_current_win(saved)
+
+  local job_id = vim.fn.termopen(args, {
+    cwd    = opts.cwd,
+    on_exit = function(id, code)
+      vim.schedule(function()
+        untrack(id)
+        if opts.on_exit then opts.on_exit(code) end
+      end)
+    end,
+  })
+
+  if job_id > 0 then
+    local ok, pid = pcall(vim.fn.jobpid, job_id)
+    _jobs[job_id] = { label = label, buf = buf, pid = ok and pid or nil, cmd = args }
+    -- bind x in the term buffer to stop
+    vim.keymap.set("n", "x", function() M.stop(job_id) end, { buffer = buf, silent = true })
+  end
+
+  return job_id, buf
+end
+
+-- ── Job management ────────────────────────────────────────────────────────────
+
+function M.stop(job_id)
+  pcall(vim.fn.jobstop, job_id)
+  untrack(job_id)
+end
+
+function M.stop_all()
+  local stopped = 0
+  for id in pairs(_jobs) do
+    pcall(vim.fn.jobstop, id)
+    stopped = stopped + 1
+  end
+  _jobs = {}
+  -- Also stop any other terminal buffers with active jobs
+  for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+    if vim.api.nvim_buf_is_loaded(buf) and vim.bo[buf].buftype == "terminal" then
+      local jid = vim.b[buf].terminal_job_id
+      if jid then pcall(vim.fn.jobstop, jid); stopped = stopped + 1 end
+    end
+  end
+  vim.notify("[dotnet] Stopped " .. stopped .. " process(es)", vim.log.levels.INFO)
+end
+
+--- Return list of active jobs for the jobs picker.
+function M.active_jobs()
+  local result = {}
+  -- Our tracked jobs
+  for id, j in pairs(_jobs) do
+    local ok, pid = pcall(vim.fn.jobpid, id)
+    if ok and pid then
+      table.insert(result, { job_id = id, label = j.label, buf = j.buf,
+                             cmd = read_cmdline(pid) or j.label })
+    end
+  end
+  -- Any terminal buffer not tracked
+  local seen = {}
+  for _, j in pairs(_jobs) do seen[j.buf] = true end
+  for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+    if not seen[buf] and vim.api.nvim_buf_is_loaded(buf) and vim.bo[buf].buftype == "terminal" then
+      local jid = vim.b[buf].terminal_job_id
+      if jid then
+        local ok2, pid = pcall(vim.fn.jobpid, jid)
+        local cmd = (ok2 and pid and read_cmdline(pid)) or vim.api.nvim_buf_get_name(buf)
+        table.insert(result, { job_id = jid, label = cmd, buf = buf, cmd = cmd })
+      end
+    end
+  end
+  return result
+end
+
+-- ── High-level commands ───────────────────────────────────────────────────────
+
+function M.build(target, opts)
+  opts = opts or {}
+  return M.bg({ "dotnet", "build", target },
+    vim.tbl_extend("force", opts, { label = "Build " .. vim.fn.fnamemodify(target, ":t") }))
+end
+
+function M.build_qf(target, opts)
+  opts = opts or {}
+  return M.bg({ "dotnet", "build", target },
+    vim.tbl_extend("force", opts, {
+      label    = "Build " .. vim.fn.fnamemodify(target, ":t"),
+      quickfix = true,
+    }))
+end
+
+function M.restore(target, opts)
+  opts = opts or {}
+  return M.bg({ "dotnet", "restore", target },
+    vim.tbl_extend("force", opts, { label = "Restore" }))
+end
+
+function M.clean(target, opts)
+  opts = opts or {}
+  return M.bg({ "dotnet", "clean", target },
+    vim.tbl_extend("force", opts, { label = "Clean" }))
+end
+
+function M.run(proj_path, opts)
+  opts = opts or {}
+  local cmd = { "dotnet", "run", "--project", proj_path }
+  if opts.profile then vim.list_extend(cmd, { "--launch-profile", opts.profile }) end
+  return M.term(cmd, vim.tbl_extend("force", opts, {
+    label = "Run " .. vim.fn.fnamemodify(proj_path, ":t:r"),
+    cwd   = vim.fn.fnamemodify(proj_path, ":h"),
+  }))
+end
+
+function M.watch(proj_path, opts)
+  opts = opts or {}
+  return M.term({ "dotnet", "watch", "--project", proj_path }, vim.tbl_extend("force", opts, {
+    label = "Watch " .. vim.fn.fnamemodify(proj_path, ":t:r"),
+    cwd   = vim.fn.fnamemodify(proj_path, ":h"),
+  }))
+end
+
+function M.test(target, opts)
+  opts = opts or {}
+  return M.bg({ "dotnet", "test", target },
+    vim.tbl_extend("force", opts, { label = "Test " .. vim.fn.fnamemodify(target, ":t") }))
+end
+
+function M.test_qf(target, opts)
+  opts = opts or {}
+  return M.bg({ "dotnet", "test", target },
+    vim.tbl_extend("force", opts, {
+      label    = "Test " .. vim.fn.fnamemodify(target, ":t"),
+      quickfix = true,
+    }))
+end
+
+return M
