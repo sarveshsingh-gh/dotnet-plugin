@@ -23,8 +23,8 @@ local S = {
 
 local function g(cp) return vim.fn.nr2char(cp, 1) end
 
-local ARROW_OPEN  = g(0x25BE) .. " "   -- ▾
-local ARROW_CLOSE = g(0x25B8) .. " "   -- ▸
+local ARROW_OPEN  = "▼ "
+local ARROW_CLOSE = "▶ "
 local LEAF_PAD    = "  "
 local INDENT      = "  "
 
@@ -616,7 +616,7 @@ local DISPATCH = {
   end,
 
   ["?"] = function()
-    require("dotnet.ui.explorer_help").show()
+    require("dotnet.ui.explorer_help").toggle()
   end,
 }
 
