@@ -106,7 +106,7 @@ function M.setup(cfg)
 
   -- ── Register debug commands in palette ──────────────────────────────────────
   local cmd = require("dotnet.commands.init")
-  cmd.register("debug.launch",      { category="debug", icon="󰃤 ", desc="Launch debugger (pick project)", run = function()
+  cmd.register("debug.launch",      { category="debug", icon="󰃤 ", desc="Debug", run = function()
     local sln    = require("dotnet").sln()
     local proj_m = require("dotnet.core.project")
     local notify = require("dotnet.notify")
@@ -118,8 +118,9 @@ function M.setup(cfg)
       local name     = vim.fn.fnamemodify(proj_path, ":t:r")
       local spin = notify.start_spinner("Building " .. name .. "…")
       local build_err = {}
-      vim.fn.jobstart({ "dotnet", "build", proj_path, "--nologo", "-q" }, {
+      vim.fn.jobstart({ "dotnet", "build", proj_path, "--nologo" }, {
         cwd = proj_dir,
+        stdout_buffered = true,
         stderr_buffered = true,
         on_stderr = function(_, data) for _, l in ipairs(data or {}) do if l ~= "" then build_err[#build_err+1] = l end end end,
         on_exit = function(_, code)
