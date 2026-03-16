@@ -386,7 +386,12 @@ end
 
 local function refresh()
   if not S.sln_path then return end
-  local projs = solution.projects(S.sln_path)
+  local all_projs = solution.projects(S.sln_path)
+  -- only show test projects
+  local proj_m = require("dotnet.core.project")
+  local projs = vim.tbl_filter(function(p)
+    return proj_m.kind(p) == "test"
+  end, all_projs)
   if not projs or #projs == 0 then
     S.nodes = {}
     render()
