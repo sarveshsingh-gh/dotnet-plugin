@@ -3,7 +3,8 @@
 -- term() → terminal job  (run/watch)            — opens a terminal buffer
 local M = {}
 
-local _jobs = {}   -- [job_id] = { label, buf, pid, cmd }
+local _jobs = {}    -- [job_id] = { label, buf, pid, cmd }        active
+local _log  = {}    -- list of { label, status, lines, time }     completed (capped at 50)
 
 -- ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -14,9 +15,22 @@ local function read_cmdline(pid)
   return s:gsub("%z", " "):gsub("%s+$", "")
 end
 
-local function untrack(job_id)
+local function untrack(job_id, status, lines)
+  local j = _jobs[job_id]
+  if j then
+    table.insert(_log, {
+      label  = j.label,
+      status = status or "done",
+      lines  = lines or {},
+      time   = os.date("%H:%M:%S"),
+    })
+    if #_log > 50 then table.remove(_log, 1) end
+  end
   _jobs[job_id] = nil
 end
+
+function M.job_log() return _log end
+function M.clear_log() _log = {} end
 
 -- ── Quickfix parser ───────────────────────────────────────────────────────────
 -- Parses dotnet build/test stdout into a quickfix list.
@@ -58,11 +72,11 @@ function M.bg(args, opts)
     on_stderr  = function(_, data) vim.list_extend(stderr, data) end,
     on_exit    = function(id, code)
       vim.schedule(function()
-        untrack(id)
+        local all_out = vim.list_extend(vim.deepcopy(stdout), stderr)
+        local status  = code == 0 and "ok" or "failed"
+        untrack(id, status, all_out)
         if code ~= 0 then
           -- dotnet build writes errors to stdout; show both
-          local all_out = vim.list_extend(vim.deepcopy(stdout), stderr)
-          -- keep only non-empty lines and cap to last 30 to avoid huge notifications
           local err_lines = {}
           for _, l in ipairs(all_out) do
             if vim.trim(l) ~= "" then table.insert(err_lines, l) end
