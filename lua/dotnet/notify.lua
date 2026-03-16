@@ -39,9 +39,8 @@ function M.stop_spinner(id)
   s.timer:stop()
   s.timer:close()
   _spinners[id] = nil
-  vim.schedule(function()
-    vim.api.nvim_echo({ { "" } }, false, {})
-  end)
+  -- clear inline — no nested schedule, caller is already in a scheduled context
+  vim.api.nvim_echo({ { "" } }, false, {})
 end
 
 return M
