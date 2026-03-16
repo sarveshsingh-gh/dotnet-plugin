@@ -665,6 +665,8 @@ end
 
 -- ── Public API ────────────────────────────────────────────────────────────────
 
+local _saved_showtabline = nil
+
 function M.set_sln(sln_path)
   S.sln_path = sln_path
   if S.win and vim.api.nvim_win_is_valid(S.win) then refresh() end
@@ -679,6 +681,9 @@ function M.open()
       return
     end
   end
+  -- hide tabline so panel fills flush to the top edge
+  _saved_showtabline = vim.o.showtabline
+  vim.o.showtabline = 0
   open_win()
   setup_keymaps()
   refresh()
@@ -690,6 +695,11 @@ function M.close()
   end
   S.win = nil
   S.buf = nil
+  -- restore tabline
+  if _saved_showtabline ~= nil then
+    vim.o.showtabline = _saved_showtabline
+    _saved_showtabline = nil
+  end
 end
 
 function M.toggle()
