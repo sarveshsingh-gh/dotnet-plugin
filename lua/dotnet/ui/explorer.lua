@@ -657,8 +657,10 @@ local function open_win()
   wo.wrap           = false
   wo.winfixwidth    = true
   wo.cursorline     = true
-  wo.winhighlight   = "Normal:NvimTreeNormal,NormalNC:NvimTreeNormalNC,CursorLine:NvimTreeCursorLine"
-  vim.opt_local.fillchars = { eob = " " }
+  wo.winbar         = ""
+  wo.statuscolumn   = ""
+  wo.winhighlight   = "Normal:NvimTreeNormal,NormalNC:NvimTreeNormalNC,CursorLine:NvimTreeCursorLine,WinSeparator:WinSeparator"
+  vim.opt_local.fillchars = { eob = " ", vert = "▕", vertright = "▕", vertleft = "▕" }
 end
 
 -- ── Public API ────────────────────────────────────────────────────────────────
