@@ -76,14 +76,7 @@ function M.bg(args, opts)
         local status  = code == 0 and "ok" or "failed"
         untrack(id, status, all_out)
         if code ~= 0 then
-          -- dotnet build writes errors to stdout; show both
-          local err_lines = {}
-          for _, l in ipairs(all_out) do
-            if vim.trim(l) ~= "" then table.insert(err_lines, l) end
-          end
-          local tail = #err_lines > 30 and vim.list_slice(err_lines, #err_lines - 29) or err_lines
-          local msg  = table.concat(tail, "\n")
-          vim.notify("[dotnet] " .. label .. " failed\n" .. msg, vim.log.levels.ERROR)
+          vim.notify("[dotnet] " .. label .. " failed — press gx to see log", vim.log.levels.ERROR)
         else
           if opts.notify_success ~= false then
             vim.notify("[dotnet] " .. label .. " succeeded", vim.log.levels.INFO)
