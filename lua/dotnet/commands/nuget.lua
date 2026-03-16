@@ -3,10 +3,17 @@ local cmd    = require("dotnet.commands.init")
 local runner = require("dotnet.core.runner")
 local picker = require("dotnet.ui.picker")
 
+-- Percent-encode a string for use in URLs
+local function url_encode(s)
+  return (s:gsub("[^%w%-_%.~]", function(c)
+    return string.format("%%%02X", string.byte(c))
+  end))
+end
+
 -- Search NuGet.org via the nuget search API (no auth required)
 local function search_packages(query, cb)
   local url = "https://azuresearch-usnc.nuget.org/query?q="
-    .. vim.uri_encode(query) .. "&take=50&prerelease=false"
+    .. url_encode(query) .. "&take=50&prerelease=false"
 
   local buf = {}
   vim.fn.jobstart({ "curl", "-sf", url }, {
