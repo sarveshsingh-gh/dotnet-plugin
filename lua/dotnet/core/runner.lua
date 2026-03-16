@@ -255,17 +255,19 @@ end
 
 function M.test(target, opts)
   opts = opts or {}
-  return M.bg({ "dotnet", "test", target },
-    vim.tbl_extend("force", opts, { label = "Test " .. vim.fn.fnamemodify(target, ":t") }))
+  return M.bg({ "dotnet", "test", target }, vim.tbl_extend("force", {
+    cwd   = vim.fn.fnamemodify(target, ":h"),
+    label = "Test " .. vim.fn.fnamemodify(target, ":t"),
+  }, opts))
 end
 
 function M.test_qf(target, opts)
   opts = opts or {}
-  return M.bg({ "dotnet", "test", target },
-    vim.tbl_extend("force", opts, {
-      label    = "Test " .. vim.fn.fnamemodify(target, ":t"),
-      quickfix = true,
-    }))
+  return M.bg({ "dotnet", "test", target }, vim.tbl_extend("force", {
+    cwd      = vim.fn.fnamemodify(target, ":h"),
+    label    = "Test " .. vim.fn.fnamemodify(target, ":t"),
+    quickfix = true,
+  }, opts))
 end
 
 return M

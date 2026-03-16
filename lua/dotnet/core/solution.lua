@@ -1,12 +1,19 @@
 -- Parse and manage .sln / .slnx solution files.
 local M = {}
 
---- Find the first .slnx or .sln in dir (default: cwd).
+--- Find the first .slnx or .sln, walking up from dir (default: cwd).
 function M.find(dir)
-  dir = dir or vim.fn.getcwd()
-  for _, pat in ipairs({ "*.slnx", "*.sln" }) do
-    local hits = vim.fn.glob(dir .. "/" .. pat, false, true)
-    if #hits > 0 then return hits[1] end
+  local d = vim.fn.fnamemodify(dir or vim.fn.getcwd(), ":p")
+  -- strip trailing slash
+  d = d:gsub("/$", "")
+  while d ~= "" do
+    for _, pat in ipairs({ "*.slnx", "*.sln" }) do
+      local hits = vim.fn.glob(d .. "/" .. pat, false, true)
+      if #hits > 0 then return hits[1] end
+    end
+    local parent = vim.fn.fnamemodify(d, ":h")
+    if parent == d then break end
+    d = parent
   end
 end
 

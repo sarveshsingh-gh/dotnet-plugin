@@ -7,9 +7,17 @@ local project  = require("dotnet.core.project")
 --- Pick a solution (finds automatically, or lets user pick if multiple exist).
 -- cb(sln_path)
 function M.solution(cb)
-  local sln = solution.find()
+  -- 1. Use cached sln from startup
+  local sln = require("dotnet").sln()
+  -- 2. Walk up from current buffer's directory
+  if not sln then
+    local bufdir = vim.fn.fnamemodify(vim.api.nvim_buf_get_name(0), ":h")
+    if bufdir ~= "" and bufdir ~= "." then sln = solution.find(bufdir) end
+  end
+  -- 3. Walk up from cwd
+  if not sln then sln = solution.find() end
   if sln then return cb(sln) end
-  require("dotnet.notify").warn("No .sln/.slnx found in cwd")
+  require("dotnet.notify").warn("No .sln/.slnx found")
 end
 
 --- Pick a project from the solution.
@@ -32,6 +40,23 @@ function M.project(opts, cb)
       if p then cb(p, sln) end
     end)
   end)
+end
+
+--- Find the project that owns the current buffer's file.
+-- Returns proj_path or nil.
+function M.project_for_current_file(sln)
+  local file = vim.api.nvim_buf_get_name(0)
+  if file == "" then return nil end
+  local projs = solution.projects(sln)
+  -- longest matching project dir wins
+  local best, best_len = nil, 0
+  for _, p in ipairs(projs) do
+    local dir = vim.fn.fnamemodify(p, ":h") .. "/"
+    if file:sub(1, #dir) == dir and #dir > best_len then
+      best, best_len = p, #dir
+    end
+  end
+  return best
 end
 
 --- Pick a runnable project (web or console).

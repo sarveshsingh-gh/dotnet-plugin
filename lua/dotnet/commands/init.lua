@@ -12,6 +12,20 @@
 local M = {}
 local _registry = {}   -- id → definition
 
+-- Filetypes used by common dashboard plugins
+local DASH_FT = { nvdash = true, alpha = true, dashboard = true, starter = true }
+
+local function close_dashboard()
+  for _, win in ipairs(vim.api.nvim_list_wins()) do
+    local buf = vim.api.nvim_win_get_buf(win)
+    if DASH_FT[vim.bo[buf].filetype] then
+      vim.api.nvim_win_call(win, function() vim.cmd("enew") end)
+    end
+  end
+end
+
+M.close_dashboard = close_dashboard
+
 function M.register(id, def)
   assert(def.desc and def.run, "dotnet command '" .. id .. "' needs desc + run")
   _registry[id] = vim.tbl_extend("keep", def, { id = id, icon = def.icon or "" })
@@ -23,6 +37,7 @@ function M.run(id, ...)
     require("dotnet.notify").error("Unknown command: " .. id)
     return
   end
+  close_dashboard()
   def.run(...)
 end
 
@@ -66,7 +81,7 @@ function M.annotate_keys(km)
     -- explorer
     ["explorer.toggle"]      = km.explorer_toggle,
     ["explorer.reveal"]      = km.explorer_reveal,
-    ["test_explorer.toggle"] = km.test_explorer,
+    ["test_explorer.toggle"] = km.test_explorer,  -- <leader>te
     -- misc
     ["jobs.list"]            = km.list_jobs,
     ["nuget.add"]            = km.nuget_add,

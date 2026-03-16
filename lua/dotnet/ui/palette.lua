@@ -15,7 +15,12 @@ function M.open(opts)
     vim.ui.select(cmds, {
       prompt      = "Dotnet:",
       format_item = function(c) return (c.icon or "") .. c.desc .. "  [" .. c.category .. "]" end,
-    }, function(c) if c then c.run() end end)
+    }, function(c)
+      if c then
+        require("dotnet.commands.init").close_dashboard()
+        c.run()
+      end
+    end)
     return
   end
 
@@ -47,7 +52,10 @@ function M.open(opts)
         local sel = act_state.get_selected_entry()
         actions.close(prompt_bufnr)
         if sel then
-          vim.schedule(function() sel.value.run() end)
+          vim.schedule(function()
+            require("dotnet.commands.init").close_dashboard()
+            sel.value.run()
+          end)
         end
       end)
       return true

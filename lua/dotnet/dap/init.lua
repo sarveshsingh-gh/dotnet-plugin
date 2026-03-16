@@ -66,9 +66,10 @@ function M.setup(cfg)
         if #runnable == 1 then
           chosen = runnable[1]
         else
-          chosen = require("dotnet.ui.picker").pick_sync(runnable,
-            function(p) return vim.fn.fnamemodify(p, ":t:r") end,
-            "Debug project:")
+          vim.ui.select(runnable, {
+            prompt = "Debug project:",
+            format_item = function(p) return vim.fn.fnamemodify(p, ":t:r") end,
+          }, function(sel) chosen = sel end)
         end
         if not chosen then return dap.ABORT end
         -- Build and find the DLL
@@ -100,39 +101,121 @@ function M.setup(cfg)
     })
   end
 
-  -- ── DAP-UI ──────────────────────────────────────────────────────────────────
-  local ok_ui, dapui = pcall(require, "dapui")
-  if ok_ui then
-    dapui.setup({
-      icons = { expanded = "▾", collapsed = "▸", current_frame = "▸" },
-      layouts = {
-        {
-          elements = {
-            { id = "scopes",      size = 0.40 },
-            { id = "breakpoints", size = 0.20 },
-            { id = "stacks",      size = 0.25 },
-            { id = "watches",     size = 0.15 },
-          },
-          size     = 40,
-          position = "left",
-        },
-        {
-          elements = { { id = "repl", size = 0.6 }, { id = "console", size = 0.4 } },
-          size     = 12,
-          position = "bottom",
-        },
-      },
-    })
-
-    dap.listeners.after.event_initialized["dotnet_dapui"] = function()
-      dapui.open({ layout = 1 })
-    end
-    dap.listeners.before.event_terminated["dotnet_dapui"] = function() dapui.close() end
-    dap.listeners.before.event_exited["dotnet_dapui"]     = function() dapui.close() end
-  end
+  -- NOTE: dapui setup, layouts, and open/close listeners are intentionally NOT
+  -- done here — the host config (nvim-config) owns dapui setup to avoid conflicts.
 
   -- ── Register debug commands in palette ──────────────────────────────────────
   local cmd = require("dotnet.commands.init")
+  cmd.register("debug.launch",      { category="debug", icon="󰃤 ", desc="Launch debugger (pick project)", run = function()
+    local sln    = require("dotnet").sln()
+    local proj_m = require("dotnet.core.project")
+    local notify = require("dotnet.notify")
+    local projs  = sln and require("dotnet.core.solution").projects(sln) or {}
+    local runnable = vim.tbl_filter(proj_m.runnable, projs)
+
+    local _L = "/tmp/dl.log"
+    vim.fn.writefile({"start"}, _L)
+    local function LL(s) vim.fn.writefile({s}, _L, "a") end
+
+    local function do_launch(proj_path, profile_name, env_vars, app_url)
+      local proj_dir = vim.fn.fnamemodify(proj_path, ":h")
+      local name     = vim.fn.fnamemodify(proj_path, ":t:r")
+      local spin = notify.start_spinner("Building " .. name .. "…")
+      local build_err = {}
+      vim.fn.jobstart({ "dotnet", "build", proj_path, "--nologo" }, {
+        cwd = proj_dir,
+        stdout_buffered = true,
+        stderr_buffered = true,
+        on_stdout = function(_, data) for _, l in ipairs(data or {}) do if l ~= "" then build_err[#build_err+1] = "out:"..l end end end,
+        on_stderr = function(_, data) for _, l in ipairs(data or {}) do if l ~= "" then build_err[#build_err+1] = "err:"..l end end end,
+        on_exit = function(_, code)
+          vim.schedule(function()
+            local ok3, err3 = pcall(function()
+              notify.stop_spinner(spin)
+              for _, l in ipairs(build_err) do LL(l) end
+              LL("build exit=" .. code)
+              if code ~= 0 then
+                notify.fail("Build failed: " .. (build_err[1] or "unknown error"))
+                return
+              end
+              local dlls = vim.fn.glob(proj_dir .. "/bin/**/" .. name .. ".dll", false, true)
+              LL("dlls=" .. #dlls)
+              if #dlls == 0 then notify.warn("DLL not found after build"); return end
+              table.sort(dlls, function(a, b) return vim.fn.getftime(a) > vim.fn.getftime(b) end)
+              local dll = dlls[1]
+              local url_env = app_url and { ASPNETCORE_URLS = app_url } or {}
+              local env = vim.tbl_extend("force", vim.fn.environ(), {
+                ASPNETCORE_ENVIRONMENT = "Development",
+                DOTNET_ENVIRONMENT     = "Development",
+              }, url_env, env_vars or {})
+              if app_url then notify.info("API → " .. app_url) end
+              local adapter = cfg.adapter_name or "coreclr"
+              LL("dap.run adapter=" .. adapter .. " dll=" .. dll)
+              dap.run({
+                type        = adapter,
+                name        = "Debug: " .. name .. (profile_name and (" [" .. profile_name .. "]") or ""),
+                request     = "launch",
+                program     = dll,
+                args        = {},
+                cwd         = proj_dir,
+                stopAtEntry = false,
+                console     = "integratedTerminal",
+                env         = env,
+              })
+            end)
+            if not ok3 then notify.error("Launch: " .. tostring(err3)) end
+          end)
+        end,
+      })
+    end
+
+    local function pick_profile_then_launch(proj_path)
+      local proj_dir     = vim.fn.fnamemodify(proj_path, ":h")
+      local settings_path = proj_dir .. "/Properties/launchSettings.json"
+      local profiles = {}
+      if vim.fn.filereadable(settings_path) == 1 then
+        local ok, raw = pcall(vim.fn.readfile, settings_path)
+        if ok then
+          local ok2, data = pcall(vim.json.decode, table.concat(raw, "\n"))
+          if ok2 and data and data.profiles then
+            for pname, pdata in pairs(data.profiles) do
+              if pdata.commandName == "Project" then
+                local env_vars = pdata.environmentVariables or {}
+                table.insert(profiles, { name = pname, url = pdata.applicationUrl, env = env_vars })
+              end
+            end
+          end
+        end
+      end
+      if #profiles == 0 then
+        do_launch(proj_path, nil, {}, nil)
+      elseif #profiles == 1 then
+        local p = profiles[1]
+        local url = p.url and p.url:match("(https?://[^;]+)") or nil
+        do_launch(proj_path, p.name, p.env, url)
+      else
+        vim.ui.select(profiles, {
+          prompt = "Launch profile:",
+          format_item = function(p) return p.name .. (p.url and ("  " .. p.url) or "") end,
+        }, function(sel)
+          if not sel then return end
+          local url = sel.url and sel.url:match("(https?://[^;]+)") or nil
+          do_launch(proj_path, sel.name, sel.env, url)
+        end)
+      end
+    end
+
+    if #runnable == 0 then
+      notify.warn("No runnable projects found in solution")
+    elseif #runnable == 1 then
+      pick_profile_then_launch(runnable[1])
+    else
+      vim.ui.select(runnable, {
+        prompt = "Debug project:",
+        format_item = function(p) return vim.fn.fnamemodify(p, ":t:r") end,
+      }, function(chosen) if chosen then pick_profile_then_launch(chosen) end end)
+    end
+  end })
   cmd.register("debug.continue",    { category="debug", icon="󰐊 ", desc="Continue / Start",      run = function() dap.continue() end })
   cmd.register("debug.stop",        { category="debug", icon="󰓛 ", desc="Stop",                   run = function() dap.terminate() end })
   cmd.register("debug.step_over",   { category="debug", icon="󰆷 ", desc="Step Over",              run = function() dap.step_over() end })
@@ -143,10 +226,8 @@ function M.setup(cfg)
     dap.set_breakpoint(vim.fn.input("Condition: "))
   end })
   cmd.register("debug.clear_bps",  { category="debug", icon="󰅙 ", desc="Clear All Breakpoints",  run = function() dap.clear_breakpoints() end })
-  if ok_ui then
-    cmd.register("debug.ui_toggle", { category="debug", icon="󰙀 ", desc="Toggle Debug UI",        run = function() dapui.toggle() end })
-    cmd.register("debug.eval",      { category="debug", icon="󰃧 ", desc="Evaluate Expression",    run = function() dapui.eval() end })
-  end
+  cmd.register("debug.ui_toggle",   { category="debug", icon="󰙀 ", desc="Toggle Debug UI",        run = function() pcall(function() require("dapui").toggle() end) end })
+  cmd.register("debug.eval",        { category="debug", icon="󰃧 ", desc="Evaluate Expression",    run = function() pcall(function() require("dapui").eval() end) end })
 end
 
 return M

@@ -24,19 +24,31 @@ local ICON = {
   namespace = "󰅪 ",
   class     = " ",
   method    = " ",
-  -- state icons
+  -- state icons (plain Unicode — always renders)
   none      = "  ",
   running   = "󰔟 ",
-  passed    = " ",
-  failed    = " ",
-  skipped   = "󰅙 ",
+  passed    = "✓ ",
+  failed    = "✗ ",
+  skipped   = "○ ",
 }
 
+local STATE_SUFFIX = {
+  passed  = "  Success",
+  failed  = "  Failed",
+  skipped = "  Skipped",
+}
+
+-- Define reliable highlight groups (link to standard groups)
+vim.api.nvim_set_hl(0, "DotnetTestPassed",  { link = "DiagnosticOk",   default = true })
+vim.api.nvim_set_hl(0, "DotnetTestFailed",  { link = "DiagnosticError", default = true })
+vim.api.nvim_set_hl(0, "DotnetTestSkipped", { link = "DiagnosticWarn",  default = true })
+vim.api.nvim_set_hl(0, "DotnetTestRunning", { link = "DiagnosticInfo",  default = true })
+
 local HL = {
-  passed    = "DiagnosticOk",
-  failed    = "DiagnosticError",
-  skipped   = "DiagnosticWarn",
-  running   = "DiagnosticInfo",
+  passed    = "DotnetTestPassed",
+  failed    = "DotnetTestFailed",
+  skipped   = "DotnetTestSkipped",
+  running   = "DotnetTestRunning",
   namespace = "Directory",
   class     = "Type",
   method    = "Function",
@@ -65,11 +77,13 @@ local function discover_project(proj_path, cb)
       end
     end,
     on_exit = function()
-      -- Skip header lines (they contain spaces/dashes, not FQNs)
+      -- A valid FQN contains only word chars and dots, starts with a letter,
+      -- has at least two dot-separated segments. Rejects paths, version strings, etc.
       local tests = {}
       for _, l in ipairs(lines) do
-        if not l:match("^%-") and not l:match("^%s*$") and l:match("%.") then
-          table.insert(tests, l)
+        local t = vim.trim(l)
+        if t:match("^[%a_][%w_]*%.[%w_%.]+$") then
+          table.insert(tests, t)
         end
       end
       cb(tests)
@@ -176,29 +190,41 @@ local function render()
       skip_until_depth = nil
     end
 
-    local indent = string.rep("  ", node.depth - 1)
-    local icon   = ICON[node.kind] or "  "
-    local state  = ICON[node.state] or ICON.none
-    local toggle = ""
-    if node.kind ~= "method" then
-      toggle = node.collapsed and "▶ " or "▼ "
-    else
-      toggle = "  "
-    end
-    local line = indent .. toggle .. state .. icon .. node.label
+    local indent     = string.rep("  ", node.depth - 1)
+    local kind_icon  = ICON[node.kind] or "  "
+    local state_icon = ICON[node.state] or ICON.none
+    local toggle = node.kind ~= "method"
+      and (node.collapsed and "▶ " or "▼ ")
+      or  "  "
+    local suffix = STATE_SUFFIX[node.state] or ""
+
+    local line = indent .. toggle .. state_icon .. kind_icon .. node.label .. suffix
     local lnum = #lines
     table.insert(lines, line)
 
-    -- highlights
-    local state_hl = node.state ~= "none" and HL[node.state] or nil
+    -- Column positions (all byte-based)
+    local state_col = #indent + #toggle
+    local label_col = state_col + #state_icon + #kind_icon
+    local suffix_col = label_col + #node.label
+
+    local state_hl = (node.state ~= "none") and HL[node.state] or nil
+
+    -- State icon highlight
     if state_hl then
-      local state_col = #indent + #toggle
-      table.insert(hls, { lnum, state_hl, state_col, state_col + #state })
+      table.insert(hls, { lnum, state_hl, state_col, state_col + #state_icon })
     end
-    local label_col = #indent + #toggle + #state + #icon
-    local kind_hl   = HL[node.kind]
-    if kind_hl then
-      table.insert(hls, { lnum, kind_hl, label_col, -1 })
+    -- Label: use state colour when passed/failed/skipped, otherwise kind colour
+    if state_hl and node.state ~= "running" then
+      table.insert(hls, { lnum, state_hl, label_col, suffix_col })
+    else
+      local kind_hl = HL[node.kind]
+      if kind_hl then
+        table.insert(hls, { lnum, kind_hl, label_col, suffix_col })
+      end
+    end
+    -- Suffix (e.g. "  Success") in same state colour, dimmer
+    if suffix ~= "" and state_hl then
+      table.insert(hls, { lnum, "Comment", suffix_col, -1 })
     end
 
     if node.collapsed and node.kind ~= "method" then
@@ -255,16 +281,53 @@ local function set_state(fqn_or_proj, state, is_proj)
   vim.schedule(render)
 end
 
--- Parse `dotnet test` verbose output for pass/fail/skip lines.
--- Format: "  Passed  FQN [time]" or "  Failed  FQN [time]"
-local function parse_results(lines)
+-- Parse a TRX results directory.
+-- TRX stores testName as the short method name; className lives in TestDefinitions.
+-- We build full FQNs by combining className + "." + methodName.
+-- Returns { ["Full.FQN"] = "passed"|"failed"|"skipped" }
+local function parse_trx_dir(dir)
+  local trx_files = vim.fn.glob(dir .. "/*.trx", false, true)
+  if not trx_files or #trx_files == 0 then
+    vim.fn.delete(dir, "rf")
+    return {}
+  end
+
+  local ok, lines = pcall(vim.fn.readfile, trx_files[1])
+  vim.fn.delete(dir, "rf")   -- delete AFTER reading
+  if not ok then return {} end
+
+  -- Pass 1: testId → full FQN from <TestDefinitions>
+  -- <UnitTest name="Method" id="uuid"> ... <TestMethod className="NS.Class" name="Method" /> ... </UnitTest>
+  local id_to_fqn = {}
+  local current_id = nil
+  for _, l in ipairs(lines) do
+    local id = l:match('<UnitTest[^>]+%sid="([^"]+)"')
+    if id then current_id = id end
+    if current_id then
+      local cls  = l:match('className="([^"]+)"')
+      local meth = l:match('<TestMethod[^>]+%sname="([^"]+)"')
+      if cls and meth then
+        id_to_fqn[current_id] = cls .. "." .. meth
+        current_id = nil
+      end
+    end
+  end
+
+  -- Pass 2: testId → outcome from <Results>
   local results = {}
   for _, l in ipairs(lines) do
-    local state, fqn = l:match("^%s+(%a+)%s+(.-)%s+%[")
-    if state and fqn then
-      state = state:lower()
-      if state == "passed" or state == "failed" or state == "skipped" then
-        results[fqn] = state
+    if l:find("UnitTestResult") and l:find('testId=') and l:find('outcome=') then
+      local tid     = l:match('testId="([^"]+)"')
+      local outcome = l:match('outcome="([^"]+)"')
+      if tid and outcome then
+        local fqn = id_to_fqn[tid]
+        if fqn then
+          local st = outcome:lower()
+          if     st == "passed"      then results[fqn] = "passed"
+          elseif st == "failed"      then results[fqn] = "failed"
+          elseif st == "notexecuted" or st == "skipped" then results[fqn] = "skipped"
+          end
+        end
       end
     end
   end
@@ -280,73 +343,66 @@ local function run_tests(filter, proj_path, label)
       end
     end
   end
+  require("dotnet.ui.test_signs").mark_running(proj_path)
   render()
+  vim.cmd("redraw")
 
-  local args = { "dotnet", "test", "--nologo", "-v", "normal" }
+  local results_dir = vim.fn.tempname()
+  vim.fn.mkdir(results_dir, "p")
+  local args = { "dotnet", "test", "--nologo",
+                 "--logger", "trx",
+                 "--results-directory", results_dir }
   if filter then
     vim.list_extend(args, { "--filter", filter })
   end
 
-  local out = {}
   vim.fn.jobstart(args, {
-    cwd             = vim.fn.fnamemodify(proj_path, ":h"),
-    stdout_buffered = true,
-    stderr_buffered = true,
-    on_stdout = function(_, data)
-      for _, l in ipairs(data) do
-        if l ~= "" then table.insert(out, l) end
-      end
-    end,
-    on_stderr = function(_, data)
-      for _, l in ipairs(data) do
-        if l ~= "" then table.insert(out, l) end
-      end
-    end,
+    cwd     = vim.fn.fnamemodify(proj_path, ":h"),
     on_exit = function(_, code)
       vim.schedule(function()
-        local results = parse_results(out)
+        local results = parse_trx_dir(results_dir)
+        -- FQN matching: dotnet output may emit short FQNs (ClassName.Method)
+        -- while stored FQNs are fully qualified (Namespace.ClassName.Method).
+        -- Match by suffix so both short and full forms resolve correctly.
+        local function fqn_matches(node_fqn, result_fqn)
+          if node_fqn == result_fqn then return true end
+          -- node_fqn ends with result_fqn (suffix match with dot boundary)
+          if #node_fqn >= #result_fqn then
+            local suffix = node_fqn:sub(-(#result_fqn))
+            if suffix == result_fqn then
+              local boundary = node_fqn:sub(-(#result_fqn) - 1, -(#result_fqn) - 1)
+              return boundary == "." or boundary == ""
+            end
+          end
+          return false
+        end
+
         for fqn, st in pairs(results) do
           for _, node in ipairs(S.nodes) do
-            if node.fqn == fqn then node.state = st end
+            if node.fqn and fqn_matches(node.fqn, fqn) then node.state = st end
           end
         end
-        -- roll up to class/ns/project
-        local function roll_up(depth_child, depth_parent, key_fn)
-          local parent_state = {}
-          for _, node in ipairs(S.nodes) do
-            if node.depth == depth_child and node.state ~= "none" and node.state ~= "running" then
-              local pk = key_fn(node)
-              local cur = parent_state[pk]
-              if cur == nil then
-                parent_state[pk] = node.state
-              elseif cur == "passed" and node.state ~= "passed" then
-                parent_state[pk] = node.state
-              elseif cur == "skipped" and node.state == "failed" then
-                parent_state[pk] = "failed"
-              end
-            end
-          end
-          for _, node in ipairs(S.nodes) do
-            if node.depth == depth_parent then
-              local pk = key_fn(node) -- same key logic for parent
-              if parent_state[pk] then node.state = parent_state[pk] end
-            end
-          end
-        end
-        -- method→class: key = proj+class_fqn, ns→proj: key = proj
-        -- simple approach: match by label prefix
+
+        -- After shift in refresh(), depths are: project=2, namespace=3, class=4, method=5
+        -- Clear "running" on methods that had no result
         for _, node in ipairs(S.nodes) do
-          if node.depth == 4 and node.fqn and not results[node.fqn] then
-            if node.state == "running" then node.state = "none" end
+          if node.depth == 5 and node.fqn and node.state == "running" then
+            -- check if any result matched
+            local matched = false
+            for fqn, _ in pairs(results) do
+              if fqn_matches(node.fqn, fqn) then matched = true; break end
+            end
+            if not matched then node.state = "none" end
           end
         end
-        -- Roll up classes from methods
+
+        -- Roll up methods (depth=5) → classes (depth=4)
         for _, cls_node in ipairs(S.nodes) do
-          if cls_node.depth == 3 and cls_node.fqn then
+          if cls_node.depth == 4 and cls_node.fqn then
             local worst = nil
             for _, m in ipairs(S.nodes) do
-              if m.depth == 4 and m.proj == cls_node.proj
-                  and m.fqn and m.fqn:sub(1, #cls_node.fqn) == cls_node.fqn then
+              if m.depth == 5 and m.proj == cls_node.proj
+                  and m.fqn and m.fqn:sub(1, #cls_node.fqn + 1) == cls_node.fqn .. "." then
                 if m.state ~= "none" and m.state ~= "running" then
                   if worst == nil then worst = m.state
                   elseif worst == "passed" then worst = m.state
@@ -358,12 +414,33 @@ local function run_tests(filter, proj_path, label)
             if worst then cls_node.state = worst end
           end
         end
-        -- Roll up ns from classes, project from ns
-        for _, p in ipairs(S.nodes) do
-          if p.depth == 1 then
+
+        -- Roll up classes (depth=4) → namespace (depth=3)
+        -- Class FQN = "Namespace.ClassName", namespace label = "Namespace"
+        for _, ns_node in ipairs(S.nodes) do
+          if ns_node.depth == 3 and ns_node.proj then
+            local ns_prefix = ns_node.label ~= "(global)" and (ns_node.label .. ".") or ""
             local worst = nil
             for _, n in ipairs(S.nodes) do
-              if n.proj == p.proj and n.depth == 3 and n.state ~= "none" and n.state ~= "running" then
+              if n.proj == ns_node.proj and n.depth == 4 and n.fqn
+                  and n.state ~= "none" and n.state ~= "running"
+                  and (ns_prefix == "" or n.fqn:sub(1, #ns_prefix) == ns_prefix) then
+                if worst == nil then worst = n.state
+                elseif worst == "passed" then worst = n.state
+                elseif worst == "skipped" and n.state == "failed" then worst = "failed"
+                end
+              end
+            end
+            ns_node.state = worst or "none"
+          end
+        end
+
+        -- Roll up classes (depth=4) → project (depth=2)
+        for _, p in ipairs(S.nodes) do
+          if p.depth == 2 then
+            local worst = nil
+            for _, n in ipairs(S.nodes) do
+              if n.proj == p.proj and n.depth == 4 and n.state ~= "none" and n.state ~= "running" then
                 if worst == nil then worst = n.state
                 elseif worst == "passed" then worst = n.state
                 elseif worst == "skipped" and n.state == "failed" then worst = "failed"
@@ -373,8 +450,33 @@ local function run_tests(filter, proj_path, label)
             if worst then p.state = worst end
           end
         end
-        if code ~= 0 and vim.tbl_isempty(results) then
-          require("dotnet.notify").error("" .. label .. " failed (exit " .. code .. ")")
+        -- Annotate open .cs buffers with pass/fail signs + virtual text
+        require("dotnet.ui.test_signs").annotate(results)
+
+        -- Always clear any nodes stuck in "running"
+        for _, node in ipairs(S.nodes) do
+          if node.state == "running" then node.state = "none" end
+        end
+
+        -- Summary notification
+        local notify = require("dotnet.notify")
+        local total, passed, failed = 0, 0, 0
+        for _, st in pairs(results) do
+          total = total + 1
+          if st == "passed" then passed = passed + 1
+          elseif st == "failed" then failed = failed + 1
+          end
+        end
+        if total > 0 then
+          if failed > 0 then
+            notify.fail(label .. ": " .. failed .. " failed, " .. passed .. "/" .. total .. " passed")
+          else
+            notify.ok(label .. ": all " .. total .. " passed")
+          end
+        elseif code ~= 0 then
+          notify.fail(label .. " — build failed, press gx to see log")
+        else
+          notify.ok(label .. " — complete")
         end
         render()
       end)
@@ -484,8 +586,12 @@ local function setup_keymaps()
   map("R", function()
     if not S.sln_path then return end
     for _, node in ipairs(S.nodes) do node.state = "none" end
+    -- only run test projects (same filter as refresh)
+    local proj_m = require("dotnet.core.project")
     for _, proj in ipairs(solution.projects(S.sln_path)) do
-      run_tests(nil, proj, "all")
+      if proj_m.kind(proj) == "test" then
+        run_tests(nil, proj, "all")
+      end
     end
   end)
 
@@ -503,8 +609,11 @@ local function setup_keymaps()
   map("<F5>", function()
     for _, node in ipairs(S.nodes) do node.state = "none" end
     if S.sln_path then
+      local proj_m = require("dotnet.core.project")
       for _, proj in ipairs(solution.projects(S.sln_path)) do
-        run_tests(nil, proj, "all")
+        if proj_m.kind(proj) == "test" then
+          run_tests(nil, proj, "all")
+        end
       end
     end
   end)
@@ -515,16 +624,83 @@ local function setup_keymaps()
     render()
   end)
 
-  -- Collapse/expand all (same keys as solution explorer)
+  -- Collapse current node / expand current node one level
   map("W", function()
+    local node = cursor_node()
+    if node and node.kind ~= "method" then
+      node.collapsed = true
+      render()
+    end
+  end)
+  map("E", function()
+    local node = cursor_node()
+    if node and node.kind ~= "method" then
+      node.collapsed = false
+      render()
+    end
+  end)
+  -- Collapse / expand ALL
+  map("zM", function()
     for _, node in ipairs(S.nodes) do
       if node.kind ~= "method" then node.collapsed = true end
     end
     render()
   end)
-  map("E", function()
+  map("zR", function()
     for _, node in ipairs(S.nodes) do node.collapsed = false end
     render()
+  end)
+
+  -- Go to test file (find .cs file containing the class)
+  map("gf", function()
+    local node = cursor_node()
+    if not node or not node.proj then return end
+    local class_name
+    if node.kind == "method" and node.fqn then
+      local parts = vim.split(node.fqn, "%.")
+      class_name = parts[#parts - 1]
+    elseif node.kind == "class" and node.fqn then
+      local parts = vim.split(node.fqn, "%.")
+      class_name = parts[#parts]
+    end
+    if not class_name then return end
+    local proj_dir = vim.fn.fnamemodify(node.proj, ":h")
+    local files = vim.fn.systemlist(
+      "grep -rl 'class " .. class_name .. "' " .. vim.fn.shellescape(proj_dir) .. " --include='*.cs' 2>/dev/null"
+    )
+    if not files or #files == 0 then
+      require("dotnet.notify").warn("No file found for class " .. class_name)
+      return
+    end
+    local target
+    for _, w in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+      if w ~= S.win then
+        local bt = vim.bo[vim.api.nvim_win_get_buf(w)].buftype
+        if bt == "" or bt == "acwrite" then target = w; break end
+      end
+    end
+    if not target then
+      vim.cmd("botright vsplit")
+      target = vim.api.nvim_get_current_win()
+      vim.api.nvim_set_current_win(S.win)
+    end
+    vim.api.nvim_win_call(target, function()
+      vim.cmd("edit " .. vim.fn.fnameescape(files[1]))
+    end)
+    vim.api.nvim_set_current_win(target)
+  end)
+
+  -- Tab: jump to editor window (prevents NvChad tabufline crash)
+  map("<Tab>", function()
+    for _, w in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+      if w ~= S.win then
+        local bt = vim.bo[vim.api.nvim_win_get_buf(w)].buftype
+        if bt == "" or bt == "acwrite" then
+          vim.api.nvim_set_current_win(w)
+          return
+        end
+      end
+    end
   end)
 
   -- Close
@@ -585,6 +761,8 @@ end
 
 -- ── Window management ─────────────────────────────────────────────────────────
 
+local _saved_showtabline = nil
+
 local function open_win()
   local width = 40
   vim.cmd("topleft " .. width .. "vsplit")
@@ -596,6 +774,7 @@ local function open_win()
   bo.buftype   = "nofile"
   bo.bufhidden = "hide"
   bo.swapfile  = false
+  bo.buflisted = false
   bo.filetype  = "dotnet_test_explorer"
 
   local wo = vim.wo[S.win]
@@ -605,15 +784,24 @@ local function open_win()
   wo.wrap           = false
   wo.cursorline     = true
   wo.winfixwidth    = true
+  wo.winbar         = ""
+  wo.statuscolumn   = ""
 
   vim.api.nvim_buf_set_name(S.buf, "Test Explorer")
   setup_keymaps()
+  _saved_showtabline = vim.o.showtabline
+  vim.o.showtabline = 0
+
   vim.api.nvim_create_autocmd("WinClosed", {
     buffer = S.buf,
     once   = true,
     callback = function()
       S.win = nil
       S.buf = nil
+      if _saved_showtabline ~= nil then
+        vim.o.showtabline = _saved_showtabline
+        _saved_showtabline = nil
+      end
     end,
   })
 end
@@ -646,6 +834,7 @@ function M.toggle()
   if S.win and vim.api.nvim_win_is_valid(S.win) then
     M.close()
   else
+    require("dotnet.commands.init").close_dashboard()
     M.open()
   end
 end

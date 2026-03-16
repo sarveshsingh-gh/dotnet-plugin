@@ -18,9 +18,19 @@ reg("test.project", {
   icon = "󰙨 ",
   desc = "Test project",
   run  = function()
-    picker.project({ prompt = "Test project:" }, function(proj)
-      runner.test(proj)
-    end)
+    -- Auto-detect from current buffer; fall back to picker
+    local file = vim.api.nvim_buf_get_name(0)
+    local sln  = require("dotnet").sln()
+    if sln and file ~= "" then
+      for _, p in ipairs(require("dotnet.core.solution").projects(sln)) do
+        local dir = vim.fn.fnamemodify(p, ":h") .. "/"
+        if file:sub(1, #dir) == dir then
+          runner.test(p)
+          return
+        end
+      end
+    end
+    picker.project({ prompt = "Test project:" }, function(p) runner.test(p) end)
   end,
 })
 

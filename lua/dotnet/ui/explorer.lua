@@ -101,6 +101,8 @@ local KIND_HL = {
 
 -- ── Forward declarations ───────────────────────────────────────────────────────
 
+local HEADER_OFFSET = 2   -- "  Solution Explorer" + separator
+
 local refresh        -- defined below
 local action_open_file  -- defined below
 
@@ -111,21 +113,7 @@ local function build_nodes()
   local sln   = S.sln_path
   if not sln then return nodes end
 
-  local sln_name  = vim.fn.fnamemodify(sln, ":t:r")
-  local sln_coll  = S.collapsed[sln] or false
   local proj_list = solution.projects(sln)
-
-  -- Solution root
-  local sln_ic = sln_icon()
-  table.insert(nodes, {
-    text     = sln_ic .. sln_name,
-    text_sfx = "  · " .. #proj_list .. " project" .. (#proj_list == 1 and "" or "s"),
-    indent   = 0, kind = "solution", path = sln,
-    collapsed = sln_coll,
-    _ibytes  = #sln_ic, _ihl = nil,
-  })
-
-  if sln_coll then return nodes end
 
   for _, proj_path in ipairs(proj_list) do
     local proj_name = vim.fn.fnamemodify(proj_path, ":t:r")
@@ -212,7 +200,7 @@ end
 
 local function render()
   if not S.buf or not vim.api.nvim_buf_is_valid(S.buf) then return end
-  local lines = {}
+  local lines = { "  Solution Explorer", string.rep("─", 30) }
   for _, n in ipairs(S.nodes) do
     local ind    = INDENT:rep(n.indent)
     local is_leaf = n.kind == "file" or n.kind == "pkg" or n.kind == "projref"
@@ -229,15 +217,17 @@ local function render()
 
   -- Highlights
   vim.api.nvim_buf_clear_namespace(S.buf, HL_NS, 0, -1)
-  for row, n in ipairs(S.nodes) do
+  vim.api.nvim_buf_add_highlight(S.buf, HL_NS, "Title", 0, 0, -1)
+  for idx, n in ipairs(S.nodes) do
+    local row = idx - 1 + HEADER_OFFSET  -- 0-based screen row
     local hl = KIND_HL[n.kind] or "Normal"
-    vim.api.nvim_buf_set_extmark(S.buf, HL_NS, row - 1, n._pfx, {
+    vim.api.nvim_buf_set_extmark(S.buf, HL_NS, row, n._pfx, {
       end_col   = n._name_end,
       hl_group  = hl,
       priority  = 200,
     })
     if n._ihl and n._ibytes > 0 then
-      vim.api.nvim_buf_set_extmark(S.buf, HL_NS, row - 1, n._pfx, {
+      vim.api.nvim_buf_set_extmark(S.buf, HL_NS, row, n._pfx, {
         end_col  = n._pfx + n._ibytes,
         hl_group = n._ihl,
         priority = 300,
@@ -245,8 +235,8 @@ local function render()
     end
     -- Dim text_sfx
     if n.text_sfx then
-      vim.api.nvim_buf_set_extmark(S.buf, HL_NS, row - 1, n._name_end, {
-        end_col  = #lines[row],
+      vim.api.nvim_buf_set_extmark(S.buf, HL_NS, row, n._name_end, {
+        end_col  = #lines[idx + HEADER_OFFSET],
         hl_group = "Comment",
         priority = 200,
       })
@@ -264,7 +254,8 @@ end
 local function current_node()
   if not S.win or not vim.api.nvim_win_is_valid(S.win) then return nil end
   local row = vim.api.nvim_win_get_cursor(S.win)[1]
-  return S.nodes[row], row
+  local idx = row - HEADER_OFFSET
+  return S.nodes[idx], idx
 end
 
 local function nearest_project(from_row)
@@ -481,8 +472,7 @@ local function action_reveal_path(target_path)
   for _, pp in ipairs(proj_list) do
     local pd = vim.fn.fnamemodify(pp, ":h")
     if target_path:sub(1, #pd + 1) == pd .. "/" then
-      S.collapsed[S.sln_path] = false
-      S.collapsed[pp]         = false
+      S.collapsed[pp] = false
       proj_dir = pd
       break
     end
@@ -498,7 +488,7 @@ local function action_reveal_path(target_path)
   refresh()
   for i, n in ipairs(S.nodes) do
     if n.path == target_path then
-      pcall(vim.api.nvim_win_set_cursor, S.win, { i, 0 })
+      pcall(vim.api.nvim_win_set_cursor, S.win, { i + HEADER_OFFSET, 0 })
       return
     end
   end
@@ -634,6 +624,17 @@ local function setup_keymaps()
   vim.keymap.set("n", "q",     M.close,  o)
   vim.keymap.set("n", "<esc>", M.close,  o)
   vim.keymap.set("n", "gx",    function() require("dotnet.telescope.jobs").open() end, o)
+  vim.keymap.set("n", "<Tab>", function()
+    for _, w in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+      if w ~= S.win then
+        local bt = vim.bo[vim.api.nvim_win_get_buf(w)].buftype
+        if bt == "" or bt == "acwrite" then
+          vim.api.nvim_set_current_win(w)
+          return
+        end
+      end
+    end
+  end, o)
 end
 
 local function open_win()
@@ -642,6 +643,7 @@ local function open_win()
   vim.bo[S.buf].bufhidden  = "wipe"
   vim.bo[S.buf].modifiable = false
   vim.bo[S.buf].buftype    = "nofile"
+  vim.bo[S.buf].buflisted  = false
   vim.api.nvim_buf_set_name(S.buf, "Solution Explorer")
 
   local width = panel_width()
@@ -704,7 +706,10 @@ end
 
 function M.toggle()
   if S.win and vim.api.nvim_win_is_valid(S.win) then M.close()
-  else M.open() end
+  else
+    require("dotnet.commands.init").close_dashboard()
+    M.open()
+  end
 end
 
 function M.reveal()
