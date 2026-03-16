@@ -63,13 +63,13 @@ reg("solution.new_project", {
             on_exit   = function(_, code)
               vim.schedule(function()
                 if code ~= 0 then
-                  vim.notify("[dotnet] new project failed:\n" .. table.concat(stderr, "\n"), vim.log.levels.ERROR)
+                  require("dotnet.notify").error("new project failed:\n" .. table.concat(stderr, "\n"))
                   return
                 end
                 local proj_file = out .. "/" .. name .. ".csproj"
                 if vim.fn.filereadable(proj_file) == 1 then
                   solution.add_project(sln, proj_file, function()
-                    vim.notify("[dotnet] Created and added: " .. name, vim.log.levels.INFO)
+                    require("dotnet.notify").info("Created and added: " .. name)
                   end)
                 end
               end)

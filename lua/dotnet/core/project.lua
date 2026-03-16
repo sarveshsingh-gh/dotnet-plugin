@@ -120,9 +120,9 @@ function M.add_ref(proj_path, ref_path, cb)
     on_exit   = function(_, code)
       vim.schedule(function()
         if code ~= 0 then
-          vim.notify("[dotnet] add reference failed:\n" .. table.concat(stderr, "\n"), vim.log.levels.ERROR)
+          require("dotnet.notify").error("add reference failed:\n" .. table.concat(stderr, "\n"))
         else
-          vim.notify("[dotnet] Reference added", vim.log.levels.INFO)
+          require("dotnet.notify").info("Reference added")
           if cb then cb() end
         end
       end)
@@ -140,9 +140,9 @@ function M.remove(proj_dir, kind, name_or_path, cb)
     on_exit   = function(_, code)
       vim.schedule(function()
         if code ~= 0 then
-          vim.notify("[dotnet] remove failed:\n" .. table.concat(stderr, "\n"), vim.log.levels.ERROR)
+          require("dotnet.notify").error("remove failed:\n" .. table.concat(stderr, "\n"))
         else
-          vim.notify("[dotnet] Removed " .. name_or_path, vim.log.levels.INFO)
+          require("dotnet.notify").info("Removed " .. name_or_path)
           if cb then cb() end
         end
       end)

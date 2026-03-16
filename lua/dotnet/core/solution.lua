@@ -43,9 +43,9 @@ function M.add_project(sln_path, proj_path, cb)
     on_exit   = function(_, code)
       vim.schedule(function()
         if code ~= 0 then
-          vim.notify("[dotnet] sln add failed:\n" .. table.concat(stderr, "\n"), vim.log.levels.ERROR)
+          require("dotnet.notify").error("sln add failed:\n" .. table.concat(stderr, "\n"))
         else
-          vim.notify("[dotnet] Project added to solution", vim.log.levels.INFO)
+          require("dotnet.notify").info("Project added to solution")
           if cb then cb() end
         end
       end)
@@ -61,9 +61,9 @@ function M.remove_project(sln_path, proj_path, cb)
     on_exit   = function(_, code)
       vim.schedule(function()
         if code ~= 0 then
-          vim.notify("[dotnet] sln remove failed:\n" .. table.concat(stderr, "\n"), vim.log.levels.ERROR)
+          require("dotnet.notify").error("sln remove failed:\n" .. table.concat(stderr, "\n"))
         else
-          vim.notify("[dotnet] Project removed from solution", vim.log.levels.INFO)
+          require("dotnet.notify").info("Project removed from solution")
           if cb then cb() end
         end
       end)

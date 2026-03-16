@@ -85,7 +85,7 @@ function M.open()
 
   local entries = make_entries()
   if #entries == 0 then
-    vim.notify("[dotnet] No jobs (running or recent)", vim.log.levels.INFO)
+    require("dotnet.notify").info("No jobs (running or recent)")
     return
   end
 
@@ -141,7 +141,7 @@ function M.open()
         local e = sel.value
         if e.kind == "running" and e.job_id then
           runner.stop(e.job_id)
-          vim.notify("[dotnet] Stopped: " .. e.label, vim.log.levels.INFO)
+          require("dotnet.notify").info("Stopped: " .. e.label)
         end
       end)
 
@@ -149,7 +149,7 @@ function M.open()
       map({ "i", "n" }, "<C-x>", function()
         actions.close(prompt_bufnr)
         runner.clear_log()
-        vim.notify("[dotnet] Job log cleared", vim.log.levels.INFO)
+        require("dotnet.notify").info("Job log cleared")
       end)
 
       return true

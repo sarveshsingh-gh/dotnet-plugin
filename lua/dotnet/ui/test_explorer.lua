@@ -374,7 +374,7 @@ local function run_tests(filter, proj_path, label)
           end
         end
         if code ~= 0 and vim.tbl_isempty(results) then
-          vim.notify("[dotnet] " .. label .. " failed (exit " .. code .. ")", vim.log.levels.ERROR)
+          require("dotnet.notify").error("" .. label .. " failed (exit " .. code .. ")")
         end
         render()
       end)
@@ -543,7 +543,7 @@ local function setup_keymaps()
       "  q       Close",
       "  ?       This help",
     }
-    vim.notify(table.concat(lines, "\n"), vim.log.levels.INFO)
+    require("dotnet.notify").info(table.concat(lines, "\n"))
   end)
 end
 

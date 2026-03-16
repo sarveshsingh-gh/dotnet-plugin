@@ -376,7 +376,7 @@ local function action_new_item(proj_node, target_dir)
         on_exit   = function(_, code)
           vim.schedule(function()
             if code ~= 0 then
-              vim.notify("[dotnet] new item failed:\n" .. table.concat(stderr, "\n"), vim.log.levels.ERROR)
+              require("dotnet.notify").error("new item failed:\n" .. table.concat(stderr, "\n"))
               return
             end
             if tpl.ext == ".cs" and vim.fn.filereadable(file_path) == 1 then
@@ -407,7 +407,7 @@ local function action_delete(node)
     else
       vim.fn.delete(node.path)
     end
-    vim.notify("[dotnet] Deleted " .. vim.fn.fnamemodify(node.path, ":t"), vim.log.levels.INFO)
+    require("dotnet.notify").info("Deleted " .. vim.fn.fnamemodify(node.path, ":t"))
     refresh()
   end)
 end
@@ -432,9 +432,9 @@ local function action_remove_package(node)
       on_exit   = function(_, code)
         vim.schedule(function()
           if code ~= 0 then
-            vim.notify("[dotnet] remove failed:\n" .. table.concat(stderr, "\n"), vim.log.levels.ERROR)
+            require("dotnet.notify").error("remove failed:\n" .. table.concat(stderr, "\n"))
           else
-            vim.notify("[dotnet] Removed " .. node._pkg_name, vim.log.levels.INFO)
+            require("dotnet.notify").info("Removed " .. node._pkg_name)
             refresh()
           end
         end)
@@ -454,9 +454,9 @@ local function action_remove_projref(node)
       on_exit   = function(_, code)
         vim.schedule(function()
           if code ~= 0 then
-            vim.notify("[dotnet] remove ref failed:\n" .. table.concat(stderr, "\n"), vim.log.levels.ERROR)
+            require("dotnet.notify").error("remove ref failed:\n" .. table.concat(stderr, "\n"))
           else
-            vim.notify("[dotnet] Removed ref " .. ref_name, vim.log.levels.INFO)
+            require("dotnet.notify").info("Removed ref " .. ref_name)
             refresh()
           end
         end)
@@ -476,7 +476,7 @@ local function action_remove_from_project(proj_node)
     table.insert(items, { label = "ref: " .. pr.name, kind = "ref", path = pr.path, proj_dir = proj_dir })
   end
   if #items == 0 then
-    vim.notify("[dotnet] No packages or references to remove", vim.log.levels.INFO)
+    require("dotnet.notify").info("No packages or references to remove")
     return
   end
   vim.ui.select(items, {
@@ -496,9 +496,9 @@ local function action_remove_from_project(proj_node)
         on_exit   = function(_, code)
           vim.schedule(function()
             if code ~= 0 then
-              vim.notify("[dotnet] remove failed:\n" .. table.concat(stderr, "\n"), vim.log.levels.ERROR)
+              require("dotnet.notify").error("remove failed:\n" .. table.concat(stderr, "\n"))
             else
-              vim.notify("[dotnet] Removed " .. label, vim.log.levels.INFO)
+              require("dotnet.notify").info("Removed " .. label)
               refresh()
             end
           end)
@@ -708,7 +708,7 @@ function M.open()
   if not S.sln_path then
     S.sln_path = solution.find()
     if not S.sln_path then
-      vim.notify("[dotnet] No .sln/.slnx found in cwd", vim.log.levels.WARN)
+      require("dotnet.notify").warn("No .sln/.slnx found in cwd")
       return
     end
   end

@@ -20,7 +20,7 @@ end
 function M.run(id, ...)
   local def = _registry[id]
   if not def then
-    vim.notify("[dotnet] Unknown command: " .. id, vim.log.levels.ERROR)
+    require("dotnet.notify").error("Unknown command: " .. id)
     return
   end
   def.run(...)

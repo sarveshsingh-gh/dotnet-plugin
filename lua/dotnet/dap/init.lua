@@ -21,7 +21,7 @@ function M.setup(cfg)
     end
   end
   if not dbg_path then
-    vim.notify("[dotnet] netcoredbg not found — debugging disabled", vim.log.levels.WARN)
+    require("dotnet.notify").warn("netcoredbg not found — debugging disabled")
     return
   end
 

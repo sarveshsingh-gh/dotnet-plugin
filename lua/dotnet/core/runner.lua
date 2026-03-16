@@ -76,10 +76,10 @@ function M.bg(args, opts)
         local status  = code == 0 and "ok" or "failed"
         untrack(id, status, all_out)
         if code ~= 0 then
-          vim.notify("[dotnet] " .. label .. " failed — press gx to see log", vim.log.levels.ERROR)
+          require("dotnet.notify").error("" .. label .. " failed — press gx to see log")
         else
           if opts.notify_success ~= false then
-            vim.notify("[dotnet] " .. label .. " succeeded", vim.log.levels.INFO)
+            require("dotnet.notify").info("" .. label .. " succeeded")
           end
         end
 
@@ -90,7 +90,7 @@ function M.bg(args, opts)
           vim.fn.setqflist({}, "r", { title = label, items = qf })
           if #qf > 0 then
             vim.cmd("copen")
-            vim.notify("[dotnet] " .. #qf .. " issue(s) → quickfix", vim.log.levels.WARN)
+            require("dotnet.notify").warn("" .. #qf .. " issue(s) → quickfix")
           end
         end
 
@@ -167,7 +167,7 @@ function M.stop_all()
       if jid then pcall(vim.fn.jobstop, jid); stopped = stopped + 1 end
     end
   end
-  vim.notify("[dotnet] Stopped " .. stopped .. " process(es)", vim.log.levels.INFO)
+  require("dotnet.notify").info("Stopped " .. stopped .. " process(es)")
 end
 
 --- Return list of active jobs for the jobs picker.

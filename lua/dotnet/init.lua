@@ -71,7 +71,7 @@ function M.setup(user_opts)
       if sln then
         require("dotnet.ui.explorer").set_sln(sln)
         require("dotnet.ui.test_explorer").set_sln(sln)
-        vim.notify("[dotnet] Solution: " .. vim.fn.fnamemodify(sln, ":t"), vim.log.levels.INFO)
+        require("dotnet.notify").info("Solution: " .. vim.fn.fnamemodify(sln, ":t"))
       end
     end)
   end

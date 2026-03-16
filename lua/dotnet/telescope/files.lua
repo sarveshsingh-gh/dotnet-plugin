@@ -6,7 +6,7 @@ function M.open(sln_path, on_select)
   local project  = require("dotnet.core.project")
   local sln      = sln_path or solution.find()
   if not sln then
-    vim.notify("[dotnet] No solution found", vim.log.levels.WARN)
+    require("dotnet.notify").warn("No solution found")
     return
   end
 
@@ -26,7 +26,7 @@ function M.open(sln_path, on_select)
   end
 
   if #files == 0 then
-    vim.notify("[dotnet] No files found in solution", vim.log.levels.WARN)
+    require("dotnet.notify").warn("No files found in solution")
     return
   end
 

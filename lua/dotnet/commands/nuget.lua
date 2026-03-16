@@ -25,7 +25,7 @@ local function search_packages(query, cb)
     end,
     on_exit = function(_, code)
       if code ~= 0 then
-        vim.notify("[dotnet] NuGet search failed", vim.log.levels.WARN)
+        require("dotnet.notify").warn("NuGet search failed")
         return cb({})
       end
       local ok, decoded = pcall(vim.json.decode, table.concat(buf))
@@ -49,10 +49,10 @@ end
 local function do_add_package(proj_path)
   vim.ui.input({ prompt = "Search NuGet: " }, function(query)
     if not query or query == "" then return end
-    vim.notify("[dotnet] Searching NuGet for: " .. query, vim.log.levels.INFO)
+    require("dotnet.notify").info("Searching NuGet for: " .. query)
     search_packages(query, function(results)
       if #results == 0 then
-        vim.notify("[dotnet] No packages found", vim.log.levels.WARN)
+        require("dotnet.notify").warn("No packages found")
         return
       end
       local items = vim.tbl_map(function(p)
@@ -79,7 +79,7 @@ local function do_remove_package(proj_path)
   local ok, props = pcall(require("dotnet.core.project").deps, proj_path)
   local pkgs = (ok and props and props.pkgs) or {}
   if #pkgs == 0 then
-    vim.notify("[dotnet] No packages found in project", vim.log.levels.INFO)
+    require("dotnet.notify").info("No packages found in project")
     return
   end
   vim.ui.select(pkgs, { prompt = "Remove package:" }, function(choice)
@@ -105,10 +105,10 @@ local function do_list_packages(proj_path)
         end
       end
       if #result == 0 then
-        vim.notify("[dotnet] No packages", vim.log.levels.INFO)
+        require("dotnet.notify").info("No packages")
       else
         vim.schedule(function()
-          vim.notify("[dotnet] Packages:\n" .. table.concat(result, "\n"), vim.log.levels.INFO)
+          require("dotnet.notify").info("Packages:\n" .. table.concat(result, "\n"))
         end)
       end
     end,
@@ -128,11 +128,11 @@ local function do_outdated(proj_path)
         end
       end
       if #result == 0 then
-        vim.notify("[dotnet] All packages up to date", vim.log.levels.INFO)
+        require("dotnet.notify").info("All packages up to date")
       else
         vim.schedule(function()
           local msg = table.concat(result, "\n")
-          vim.notify("[dotnet] Outdated packages:\n" .. msg, vim.log.levels.WARN)
+          require("dotnet.notify").warn("Outdated packages:\n" .. msg)
         end)
       end
     end,

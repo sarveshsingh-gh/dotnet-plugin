@@ -9,7 +9,7 @@ local project  = require("dotnet.core.project")
 function M.solution(cb)
   local sln = solution.find()
   if sln then return cb(sln) end
-  vim.notify("[dotnet] No .sln/.slnx found in cwd", vim.log.levels.WARN)
+  require("dotnet.notify").warn("No .sln/.slnx found in cwd")
 end
 
 --- Pick a project from the solution.
@@ -21,7 +21,7 @@ function M.project(opts, cb)
     local all   = solution.projects(sln)
     local projs = opts.filter and vim.tbl_filter(opts.filter, all) or all
     if #projs == 0 then
-      vim.notify("[dotnet] No matching projects found", vim.log.levels.WARN)
+      require("dotnet.notify").warn("No matching projects found")
       return
     end
     if #projs == 1 then return cb(projs[1], sln) end

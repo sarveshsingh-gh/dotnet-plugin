@@ -64,7 +64,7 @@ local function do_new_item(proj_path, target_dir)
         on_exit   = function(_, code)
           vim.schedule(function()
             if code ~= 0 then
-              vim.notify("[dotnet] new item failed:\n" .. table.concat(stderr, "\n"), vim.log.levels.ERROR)
+              require("dotnet.notify").error("new item failed:\n" .. table.concat(stderr, "\n"))
               return
             end
             -- Fix namespace for .cs files
@@ -107,7 +107,7 @@ reg("file.fix_namespace", {
   run  = function()
     local file_path = vim.api.nvim_buf_get_name(0)
     if not file_path:match("%.cs$") then
-      vim.notify("[dotnet] Not a .cs file", vim.log.levels.WARN)
+      require("dotnet.notify").warn("Not a .cs file")
       return
     end
     local sln = solution.find()
@@ -115,14 +115,14 @@ reg("file.fix_namespace", {
     local projs = solution.projects(sln)
     local proj  = project.owner(file_path, projs)
     if not proj then
-      vim.notify("[dotnet] File not in any project", vim.log.levels.WARN)
+      require("dotnet.notify").warn("File not in any project")
       return
     end
     local ns = namespace.compute(proj, file_path)
     if namespace.patch_buf(0, ns) then
-      vim.notify("[dotnet] Namespace → " .. ns, vim.log.levels.INFO)
+      require("dotnet.notify").info("Namespace → " .. ns)
     else
-      vim.notify("[dotnet] No namespace declaration found", vim.log.levels.WARN)
+      require("dotnet.notify").warn("No namespace declaration found")
     end
   end,
 })
