@@ -67,6 +67,9 @@ M.defaults = {
     restore          = "<leader>nR",
     clean            = "<leader>nc",
     rebuild          = "<leader>nRb",
+    test_explorer    = "<leader>nT",
+    nuget_add        = "<leader>npa",
+    nuget_remove     = "<leader>npr",
   },
 }
 

@@ -27,6 +27,9 @@ function M.setup(km)
   bind(km.restore,         function() require("dotnet.commands.init").run("build.restore") end,   "Dotnet restore")
   bind(km.clean,           function() require("dotnet.commands.init").run("build.clean") end,     "Dotnet clean")
   bind(km.rebuild,         function() require("dotnet.commands.init").run("build.rebuild") end,   "Dotnet rebuild")
+  bind(km.test_explorer,   function() require("dotnet.ui.test_explorer").toggle() end,            "Dotnet test explorer")
+  bind(km.nuget_add,       function() require("dotnet.commands.init").run("nuget.add") end,       "Dotnet NuGet add")
+  bind(km.nuget_remove,    function() require("dotnet.commands.init").run("nuget.remove") end,    "Dotnet NuGet remove")
 
   -- VS-style debug F-keys
   local ok, dap = pcall(require, "dap")

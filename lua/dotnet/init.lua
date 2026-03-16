@@ -13,6 +13,7 @@ function M.setup(user_opts)
   require("dotnet.commands.test")
   require("dotnet.commands.solution")
   require("dotnet.commands.file")
+  require("dotnet.commands.nuget")
 
   -- Register jobs + files commands in palette
   local cmd = require("dotnet.commands.init")
@@ -40,6 +41,12 @@ function M.setup(user_opts)
     desc     = "Reveal current file in Explorer",
     run      = function() require("dotnet.ui.explorer").reveal() end,
   })
+  cmd.register("test_explorer.toggle", {
+    category = "test",
+    icon     = "󰙨 ",
+    desc     = "Toggle Test Explorer",
+    run      = function() require("dotnet.ui.test_explorer").toggle() end,
+  })
 
   -- DAP setup
   require("dotnet.dap.init").setup(_cfg.dap)
@@ -63,6 +70,7 @@ function M.setup(user_opts)
       local sln = require("dotnet.core.solution").find()
       if sln then
         require("dotnet.ui.explorer").set_sln(sln)
+        require("dotnet.ui.test_explorer").set_sln(sln)
         vim.notify("[dotnet] Solution: " .. vim.fn.fnamemodify(sln, ":t"), vim.log.levels.INFO)
       end
     end)
