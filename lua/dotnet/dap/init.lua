@@ -113,33 +113,24 @@ function M.setup(cfg)
     local projs  = sln and require("dotnet.core.solution").projects(sln) or {}
     local runnable = vim.tbl_filter(proj_m.runnable, projs)
 
-    local _L = "/tmp/dl.log"
-    vim.fn.writefile({"start"}, _L)
-    local function LL(s) vim.fn.writefile({s}, _L, "a") end
-
     local function do_launch(proj_path, profile_name, env_vars, app_url)
       local proj_dir = vim.fn.fnamemodify(proj_path, ":h")
       local name     = vim.fn.fnamemodify(proj_path, ":t:r")
       local spin = notify.start_spinner("Building " .. name .. "…")
       local build_err = {}
-      vim.fn.jobstart({ "dotnet", "build", proj_path, "--nologo" }, {
+      vim.fn.jobstart({ "dotnet", "build", proj_path, "--nologo", "-q" }, {
         cwd = proj_dir,
-        stdout_buffered = true,
         stderr_buffered = true,
-        on_stdout = function(_, data) for _, l in ipairs(data or {}) do if l ~= "" then build_err[#build_err+1] = "out:"..l end end end,
-        on_stderr = function(_, data) for _, l in ipairs(data or {}) do if l ~= "" then build_err[#build_err+1] = "err:"..l end end end,
+        on_stderr = function(_, data) for _, l in ipairs(data or {}) do if l ~= "" then build_err[#build_err+1] = l end end end,
         on_exit = function(_, code)
           vim.schedule(function()
             local ok3, err3 = pcall(function()
               notify.stop_spinner(spin)
-              for _, l in ipairs(build_err) do LL(l) end
-              LL("build exit=" .. code)
               if code ~= 0 then
                 notify.fail("Build failed: " .. (build_err[1] or "unknown error"))
                 return
               end
               local dlls = vim.fn.glob(proj_dir .. "/bin/**/" .. name .. ".dll", false, true)
-              LL("dlls=" .. #dlls)
               if #dlls == 0 then notify.warn("DLL not found after build"); return end
               table.sort(dlls, function(a, b) return vim.fn.getftime(a) > vim.fn.getftime(b) end)
               local dll = dlls[1]
@@ -150,7 +141,6 @@ function M.setup(cfg)
               }, url_env, env_vars or {})
               if app_url then notify.info("API → " .. app_url) end
               local adapter = cfg.adapter_name or "coreclr"
-              LL("dap.run adapter=" .. adapter .. " dll=" .. dll)
               dap.run({
                 type        = adapter,
                 name        = "Debug: " .. name .. (profile_name and (" [" .. profile_name .. "]") or ""),
