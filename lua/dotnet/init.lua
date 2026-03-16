@@ -145,12 +145,15 @@ function M.setup(user_opts)
         })
       end, { buffer = ev.buf, desc = "Run test project" })
 
-      -- dt: debug tests via DAP
+      -- dt: debug tests via DAP (runs only the test under cursor if detectable)
       vim.keymap.set("n", "dt", function()
         local proj = proj_for_buf()
         if not proj then require("dotnet.notify").warn("Not in a dotnet project"); return end
-        require("dotnet.dap.init").debug_test_project(proj)
-      end, { buffer = ev.buf, desc = "Debug test project" })
+        local dap_m  = require("dotnet.dap.init")
+        local method = dap_m.test_method_at_cursor()
+        local filter = method and ("FullyQualifiedName~" .. method) or nil
+        dap_m.debug_test_project(proj, filter)
+      end, { buffer = ev.buf, desc = "Debug test under cursor" })
     end,
   })
 

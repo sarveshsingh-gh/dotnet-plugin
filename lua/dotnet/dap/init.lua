@@ -1,17 +1,49 @@
 -- DAP + DAP-UI setup for .NET / netcoredbg.
 local M = {}
 
+--- Get the test method name at the current cursor position (treesitter or regex).
+function M.test_method_at_cursor()
+  -- Treesitter approach
+  local ok, parser = pcall(vim.treesitter.get_parser, 0, "c_sharp")
+  if ok and parser then
+    local row = vim.api.nvim_win_get_cursor(0)[1] - 1
+    local tree = parser:parse()[1]
+    local node = tree:root():descendant_for_range(row, 0, row, 999)
+    while node do
+      if node:type() == "method_declaration" then
+        for child in node:iter_children() do
+          if child:type() == "identifier" then
+            return vim.treesitter.get_node_text(child, 0)
+          end
+        end
+      end
+      node = node:parent()
+    end
+  end
+  -- Regex fallback: search upward for method signature
+  local row = vim.api.nvim_win_get_cursor(0)[1]
+  local lines = vim.api.nvim_buf_get_lines(0, 0, row, false)
+  for i = #lines, 1, -1 do
+    local m = lines[i]:match("public%s+.-%s+(%w+)%s*%(")
+    if m and m ~= "class" then return m end
+  end
+  return nil
+end
+
 --- Debug a test project using VSTEST_HOST_DEBUG=1 attach approach.
---- Can be called from test explorer or buffer keymaps.
-function M.debug_test_project(proj_path)
+--- filter: optional dotnet test --filter value (e.g. "FullyQualifiedName~MethodName")
+function M.debug_test_project(proj_path, filter)
   local ok, dap = pcall(require, "dap")
   if not ok then require("dotnet.notify").warn("nvim-dap not available"); return end
   local notify  = require("dotnet.notify")
   local proj_dir = vim.fn.fnamemodify(proj_path, ":h")
   local name     = vim.fn.fnamemodify(proj_path, ":t:r")
-  local spin     = notify.start_spinner("Waiting for test host…")
+  local label    = filter and (name .. " [" .. filter .. "]") or name
+  local spin     = notify.start_spinner("Waiting for test host… " .. label)
   local attached = false
-  vim.fn.jobstart({ "dotnet", "test", proj_path, "--no-build" }, {
+  local cmd = { "dotnet", "test", proj_path, "--no-build" }
+  if filter then vim.list_extend(cmd, { "--filter", filter }) end
+  vim.fn.jobstart(cmd, {
     cwd = proj_dir,
     env = vim.tbl_extend("force", vim.fn.environ(), { VSTEST_HOST_DEBUG = "1" }),
     stdout_buffered = false,
