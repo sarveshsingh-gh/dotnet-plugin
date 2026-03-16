@@ -79,10 +79,10 @@ function M.bg(args, opts)
         local status  = code == 0 and "ok" or "failed"
         untrack(id, status, all_out)
         if code ~= 0 then
-          notify.error(label .. " failed — press gx to see log")
+          notify.fail(label .. " — press gx to see log")
         else
           if opts.notify_success ~= false then
-            notify.info(label .. " succeeded")
+            notify.ok(label)
           end
         end
 
