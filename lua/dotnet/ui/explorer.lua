@@ -128,7 +128,8 @@ local function build_nodes()
   for _, proj_path in ipairs(proj_list) do
     local proj_name = vim.fn.fnamemodify(proj_path, ":t:r")
     local proj_dir  = vim.fn.fnamemodify(proj_path, ":h")
-    local is_coll   = S.collapsed[proj_path] or false
+    if S.collapsed[proj_path] == nil then S.collapsed[proj_path] = true end
+    local is_coll   = S.collapsed[proj_path]
     local pio       = proj_icon_for(proj_path)
 
     table.insert(nodes, {

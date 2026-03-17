@@ -129,7 +129,7 @@ local function fqns_to_nodes(proj_path, fqns)
     proj      = proj_path,
     fqn       = nil,
     state     = "none",
-    collapsed = false,
+    collapsed = true,
   })
 
   for _, ns in ipairs(ns_order) do
@@ -140,7 +140,7 @@ local function fqns_to_nodes(proj_path, fqns)
       proj      = proj_path,
       fqn       = nil,
       state     = "none",
-      collapsed = false,
+      collapsed = true,
     })
     -- sort classes
     local classes = {}
