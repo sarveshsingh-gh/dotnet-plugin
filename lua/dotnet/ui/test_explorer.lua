@@ -67,8 +67,7 @@ end
 
 -- ── Test discovery ────────────────────────────────────────────────────────────
 
-local _cache   = {}   -- proj_path → { fqns }
-local _results = {}   -- fqn → state (persists across close/reopen)
+local _cache = {}   -- proj_path → { fqns }
 
 -- Parse `dotnet test --list-tests` output into a tree structure per project.
 -- Output format (one FQN per line after the header):
@@ -413,7 +412,6 @@ local function run_tests(filter, proj_path, label)
         end
 
         for fqn, st in pairs(results) do
-          _results[fqn] = st
           for _, node in ipairs(S.nodes) do
             if node.fqn and fqn_matches(node.fqn, fqn) then node.state = st end
           end
@@ -523,7 +521,7 @@ end
 -- ── Refresh (re-discover) ─────────────────────────────────────────────────────
 
 local function refresh(force)
-  if force then _cache = {}; _results = {} end
+  if force then _cache = {} end
   if not S.sln_path then return end
   local all_projs = solution.projects(S.sln_path)
   -- only show test projects
@@ -563,14 +561,6 @@ local function refresh(force)
         vim.schedule(function()
           for _, n in ipairs(all_nodes) do
             table.insert(S.nodes, n)
-          end
-          -- Reapply cached results so ticks survive close/reopen
-          if next(_results) then
-            for _, node in ipairs(S.nodes) do
-              if node.fqn and _results[node.fqn] then
-                node.state = _results[node.fqn]
-              end
-            end
           end
           render()
         end)
