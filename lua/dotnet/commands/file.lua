@@ -120,6 +120,65 @@ reg("file.fix_namespace", {
   end,
 })
 
+reg("file.launch_settings", {
+  icon = " ",
+  desc = "Add launchSettings.json",
+  run  = function()
+    picker.runnable({ prompt = "Add launchSettings.json to:" }, function(csproj)
+      if not csproj then return end
+
+      local project_dir  = vim.fn.fnamemodify(csproj, ":h")
+      local project_name = vim.fn.fnamemodify(csproj, ":t:r")
+      local props_dir    = project_dir .. "/Properties"
+      local target       = props_dir .. "/launchSettings.json"
+
+      if vim.fn.filereadable(target) == 1 then
+        require("dotnet.notify").info("launchSettings.json already exists — opening it.")
+        vim.cmd("edit " .. vim.fn.fnameescape(target))
+        return
+      end
+
+      vim.fn.mkdir(props_dir, "p")
+
+      local template = string.format([[{
+  "$schema": "https://json.schemastore.org/launchsettings.json",
+  "profiles": {
+    "%s": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": false,
+      "applicationUrl": "https://localhost:7000;http://localhost:5000",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    },
+    "IIS Express": {
+      "commandName": "IISExpress",
+      "launchBrowser": true,
+      "launchUrl": "",
+      "applicationUrl": "https://localhost:44300;http://localhost:5000",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    }
+  }
+}
+]], project_name)
+
+      local f = io.open(target, "w")
+      if not f then
+        require("dotnet.notify").error("Failed to write " .. target)
+        return
+      end
+      f:write(template)
+      f:close()
+
+      require("dotnet.notify").info("Created " .. target)
+      vim.cmd("edit " .. vim.fn.fnameescape(target))
+    end)
+  end,
+})
+
 -- Expose do_new_item for solution explorer to call directly with context
 M = require("dotnet.commands.init")
 M.new_item = do_new_item
