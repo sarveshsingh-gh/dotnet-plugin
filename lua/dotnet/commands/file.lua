@@ -127,9 +127,8 @@ reg("file.launch_settings", {
     picker.runnable({ prompt = "Add launchSettings.json to:" }, function(csproj)
       if not csproj then return end
 
-      local project_dir  = vim.fn.fnamemodify(csproj, ":h")
-      local project_name = vim.fn.fnamemodify(csproj, ":t:r")
-      local props_dir    = project_dir .. "/Properties"
+      local project_dir = vim.fn.fnamemodify(csproj, ":h")
+      local props_dir   = project_dir .. "/Properties"
       local target       = props_dir .. "/launchSettings.json"
 
       if vim.fn.filereadable(target) == 1 then
@@ -140,30 +139,30 @@ reg("file.launch_settings", {
 
       vim.fn.mkdir(props_dir, "p")
 
-      local template = string.format([[{
+      local template = [[{
   "$schema": "https://json.schemastore.org/launchsettings.json",
   "profiles": {
-    "%s": {
+    "http": {
       "commandName": "Project",
       "dotnetRunMessages": true,
       "launchBrowser": false,
-      "applicationUrl": "https://localhost:7000;http://localhost:5000",
+      "applicationUrl": "http://localhost:5131",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       }
     },
-    "IIS Express": {
-      "commandName": "IISExpress",
-      "launchBrowser": true,
-      "launchUrl": "",
-      "applicationUrl": "https://localhost:44300;http://localhost:5000",
+    "https": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": false,
+      "applicationUrl": "https://localhost:7165;http://localhost:5131",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       }
     }
   }
 }
-]], project_name)
+]]
 
       local f = io.open(target, "w")
       if not f then
