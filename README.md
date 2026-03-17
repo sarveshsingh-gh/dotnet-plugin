@@ -1,9 +1,5 @@
 # dotnet.nvim
 
-> ⚠️ **Personal project — built for fun and for my own workflow.**
-> It works great for me, but it is not a production-ready plugin.
-
-
 A Neovim plugin for .NET development — solution explorer, test runner, debugger, and command palette, all in one place.
 
 Heavily inspired by [easy-dotnet.nvim](https://github.com/GustavEikaas/easy-dotnet.nvim) by [@GustavEikaas](https://github.com/GustavEikaas) — an excellent plugin that got me started. I built this as a personal learning project to tailor the workflow exactly to my needs.
@@ -142,8 +138,3 @@ Open palette → **Debug** → select project → select launch profile (http/ht
 - [nvim-dap](https://github.com/mfussenegger/nvim-dap) — debug adapter protocol for Neovim
 - [netcoredbg](https://github.com/Samsung/netcoredbg) — .NET debugger
 
----
-
-## Disclaimer
-
-This plugin was built for **personal use** and is tailored to my own workflow. It is not meant to compete with or replace easy-dotnet.nvim. If you find it useful, great! If something breaks, PRs are welcome — but please be nice 😄
