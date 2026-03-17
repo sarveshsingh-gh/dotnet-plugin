@@ -1,6 +1,5 @@
 # dotnet.nvim
 
-> ⚠️ **Personal project — built for fun and for my own workflow.**
 
 A Neovim plugin for .NET development — solution explorer, test runner, debugger, and command palette, all in one place.
 
