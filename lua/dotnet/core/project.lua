@@ -58,14 +58,19 @@ function M.kind(proj_path)
   if content:match('Sdk="Microsoft%.NET%.Sdk%.Web"') or content:match("Sdk='Microsoft%.NET%.Sdk%.Web'") then
     return "web"
   end
+  if content:match("Microsoft%.Azure%.Functions")
+     or content:match("Microsoft%.NET%.Sdk%.Functions")
+     or vim.fn.filereadable(vim.fn.fnamemodify(proj_path, ":h") .. "/host.json") == 1 then
+    return "function"
+  end
   if content:match("<OutputType>Exe</OutputType>") then return "console" end
   return "lib"
 end
 
---- True if the project can be run (web or console).
+--- True if the project can be run (web, console, or function).
 function M.runnable(proj_path)
   local k = M.kind(proj_path)
-  return k == "web" or k == "console"
+  return k == "web" or k == "console" or k == "function"
 end
 
 --- Recursively scan a project directory for source files.

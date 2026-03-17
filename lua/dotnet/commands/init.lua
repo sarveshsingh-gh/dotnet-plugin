@@ -84,6 +84,8 @@ function M.annotate_keys(km)
     ["test_explorer.toggle"] = km.test_explorer,  -- <leader>te
     -- run (extra)
     ["run.profile"]          = km.run_profile,
+    ["run.func"]             = km.run_func,
+    ["run.func_debug"]       = km.debug_func,
     -- file (extra)
     ["file.launch_settings"] = km.launch_settings,
     -- misc

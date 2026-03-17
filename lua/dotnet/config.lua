@@ -74,6 +74,8 @@ M.defaults = {
     run_profile      = "<leader>nrp",
     debug_launch     = "<leader>nd",
     launch_settings  = "<leader>nL",
+    run_func         = "<leader>naf",
+    debug_func       = "<leader>naF",
   },
 }
 
