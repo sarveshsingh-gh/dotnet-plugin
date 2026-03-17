@@ -15,6 +15,7 @@ function M.setup(user_opts)
   require("dotnet.commands.solution")
   require("dotnet.commands.file")
   require("dotnet.commands.nuget")
+  require("dotnet.commands.ef")
 
   -- Register jobs + files commands in palette
   local cmd = require("dotnet.commands.init")
