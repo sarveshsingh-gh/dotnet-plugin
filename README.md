@@ -2,7 +2,7 @@
 
 > ⚠️ **Personal project — built for fun and for my own workflow.**
 > It works great for me, but it is not a production-ready plugin.
-> Use it at your own risk, and please be kind 🙏
+
 
 A Neovim plugin for .NET development — solution explorer, test runner, debugger, and command palette, all in one place.
 
