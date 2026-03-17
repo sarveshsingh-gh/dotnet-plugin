@@ -139,8 +139,3 @@ Open palette → **Debug** → select project → select launch profile (http/ht
 - [nvim-dap](https://github.com/mfussenegger/nvim-dap) — debug adapter protocol for Neovim
 - [netcoredbg](https://github.com/Samsung/netcoredbg) — .NET debugger
 
----
-
-## Disclaimer
-
-This plugin was built for **personal use** and is tailored to my own workflow. It is not meant to compete with or replace easy-dotnet.nvim. If you find it useful, great! If something breaks, PRs are welcome — but please be nice 😄
