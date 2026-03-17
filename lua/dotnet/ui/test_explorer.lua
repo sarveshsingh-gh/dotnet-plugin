@@ -212,7 +212,8 @@ local function render()
   table.insert(hls, { 0, "DotnetTestFailed", f_col, f_col + #f_str })
   table.insert(hls, { 0, "DotnetTestTotal",  t_col, t_col + #t_str })
 
-  table.insert(lines, string.rep("─", 30))
+  local width = S.win and vim.api.nvim_win_is_valid(S.win) and vim.api.nvim_win_get_width(S.win) or 40
+  table.insert(lines, string.rep("─", width))
 
   -- Walk nodes; skip children of collapsed parent
   local skip_until_depth = nil
