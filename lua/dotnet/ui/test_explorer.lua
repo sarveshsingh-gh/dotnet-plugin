@@ -680,9 +680,7 @@ local function setup_keymaps()
     end
     if not class_name then return end
     local proj_dir = vim.fn.fnamemodify(node.proj, ":h")
-    local files = vim.fn.systemlist(
-      "rg -rl 'class " .. class_name .. "' " .. vim.fn.shellescape(proj_dir) .. " -g '*.cs' 2>/dev/null"
-    )
+    local files = vim.fn.globpath(proj_dir, "**/" .. class_name .. ".cs", false, true)
     if not files or #files == 0 then
       require("dotnet.notify").warn("No file found for class " .. class_name)
       return
