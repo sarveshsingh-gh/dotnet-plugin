@@ -59,12 +59,19 @@ function M.setup(user_opts)
   -- :Dotnet and :D commands
   local palette_cmd = (_cfg.palette or {}).cmd or "Dotnet"
   local palette_alias = (_cfg.palette or {}).alias or "D"
-  vim.api.nvim_create_user_command(palette_cmd, function()
-    require("dotnet.ui.palette").open()
-  end, { desc = "Dotnet command palette" })
-  pcall(vim.api.nvim_create_user_command, palette_alias, function()
-    require("dotnet.ui.palette").open()
-  end, { desc = "Dotnet command palette" })
+  local function dotnet_cmd(args)
+    local id = vim.trim(args.args or "")
+    if id ~= "" then
+      require("dotnet.commands.init").run(id)
+    else
+      require("dotnet.ui.palette").open()
+    end
+  end
+  local cmd_opts = { nargs = "?", desc = "Dotnet command palette", complete = function()
+    return vim.tbl_map(function(c) return c.id end, require("dotnet.commands.init").all())
+  end }
+  vim.api.nvim_create_user_command(palette_cmd, dotnet_cmd, cmd_opts)
+  pcall(vim.api.nvim_create_user_command, palette_alias, dotnet_cmd, cmd_opts)
 
   -- Buffer keymaps for .cs files: t = run tests, dt = debug tests
   vim.api.nvim_create_autocmd("FileType", {
