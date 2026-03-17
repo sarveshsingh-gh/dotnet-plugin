@@ -213,7 +213,8 @@ end
 
 local function render()
   if not S.buf or not vim.api.nvim_buf_is_valid(S.buf) then return end
-  local lines   = { "  Solution Explorer", string.rep("─", 30) }
+  local width = S.win and vim.api.nvim_win_is_valid(S.win) and vim.api.nvim_win_get_width(S.win) or 40
+  local lines   = { "  Solution Explorer", string.rep("─", width) }
   local visible = {}  -- nodes actually rendered, in order
   local skip_above = nil
   for _, n in ipairs(S.nodes) do
