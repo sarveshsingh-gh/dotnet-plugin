@@ -14,7 +14,8 @@ local S = {
   buf         = nil,
   win         = nil,
   sln_path    = nil,
-  nodes       = {},     -- flat rendered list
+  nodes       = {},     -- full flat list (all nodes)
+  visible     = {},     -- subset actually rendered (respects collapsed)
   collapsed   = {},     -- path → bool
   show_hidden = false,
 }
@@ -212,16 +213,24 @@ end
 
 local function render()
   if not S.buf or not vim.api.nvim_buf_is_valid(S.buf) then return end
-  local lines = { "  Solution Explorer", string.rep("─", 30) }
+  local lines   = { "  Solution Explorer", string.rep("─", 30) }
+  local visible = {}  -- nodes actually rendered, in order
+  local skip_above = nil
   for _, n in ipairs(S.nodes) do
-    local ind    = INDENT:rep(n.indent)
+    if skip_above and n.indent > skip_above then goto continue end
+    skip_above = nil
+    local ind     = INDENT:rep(n.indent)
     local is_leaf = n.kind == "file" or n.kind == "pkg" or n.kind == "projref"
-    local arrow  = is_leaf and LEAF_PAD or (n.collapsed and ARROW_CLOSE or ARROW_OPEN)
-    local line   = ind .. arrow .. n.text .. (n.text_sfx or "")
+    local arrow   = is_leaf and LEAF_PAD or (n.collapsed and ARROW_CLOSE or ARROW_OPEN)
+    local line    = ind .. arrow .. n.text .. (n.text_sfx or "")
     table.insert(lines, line)
     n._pfx      = #ind + #arrow
     n._name_end = #line - #(n.text_sfx or "")
+    table.insert(visible, n)
+    if n.collapsed and not is_leaf then skip_above = n.indent end
+    ::continue::
   end
+  S.visible = visible
 
   vim.bo[S.buf].modifiable = true
   vim.api.nvim_buf_set_lines(S.buf, 0, -1, false, lines)
@@ -230,7 +239,7 @@ local function render()
   -- Highlights
   vim.api.nvim_buf_clear_namespace(S.buf, HL_NS, 0, -1)
   vim.api.nvim_buf_add_highlight(S.buf, HL_NS, "Title", 0, 0, -1)
-  for idx, n in ipairs(S.nodes) do
+  for idx, n in ipairs(visible) do
     local row = idx - 1 + HEADER_OFFSET  -- 0-based screen row
     local hl = KIND_HL[n.kind] or "Normal"
     vim.api.nvim_buf_set_extmark(S.buf, HL_NS, row, n._pfx, {
@@ -245,7 +254,6 @@ local function render()
         priority = 300,
       })
     end
-    -- Dim text_sfx
     if n.text_sfx then
       vim.api.nvim_buf_set_extmark(S.buf, HL_NS, row, n._name_end, {
         end_col  = #lines[idx + HEADER_OFFSET],
@@ -267,12 +275,12 @@ local function current_node()
   if not S.win or not vim.api.nvim_win_is_valid(S.win) then return nil end
   local row = vim.api.nvim_win_get_cursor(S.win)[1]
   local idx = row - HEADER_OFFSET
-  return S.nodes[idx], idx
+  return S.visible[idx], idx
 end
 
 local function nearest_project(from_row)
   for i = from_row, 1, -1 do
-    local n = S.nodes[i]
+    local n = S.visible[i]
     if n and n.kind == "project" then return n end
   end
 end
@@ -498,7 +506,7 @@ local function action_reveal_path(target_path)
     dir = parent
   end
   refresh()
-  for i, n in ipairs(S.nodes) do
+  for i, n in ipairs(S.visible) do
     if n.path == target_path then
       pcall(vim.api.nvim_win_set_cursor, S.win, { i + HEADER_OFFSET, 0 })
       return
@@ -729,9 +737,9 @@ function M.reveal()
   local cur = vim.api.nvim_buf_get_name(vim.api.nvim_get_current_buf())
   if cur == "" then return end
   -- Try visible nodes first
-  for i, n in ipairs(S.nodes) do
+  for i, n in ipairs(S.visible) do
     if n.path == cur then
-      pcall(vim.api.nvim_win_set_cursor, S.win, { i, 0 })
+      pcall(vim.api.nvim_win_set_cursor, S.win, { i + HEADER_OFFSET, 0 })
       return
     end
   end
