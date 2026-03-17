@@ -1,6 +1,19 @@
 -- Telescope picker: fuzzy find files in the solution, reveal in explorer.
 local M = {}
 
+local function short(name)
+  local parts = vim.split(name, "%.", { plain = true })
+  if #parts <= 2 then return name end
+  return parts[#parts - 1] .. "." .. parts[#parts]
+end
+
+-- Truncate each path segment (folder/file name) in a slash-separated path.
+local function short_path(rel)
+  local segs = vim.split(rel, "/", { plain = true })
+  for i, s in ipairs(segs) do segs[i] = short(s) end
+  return table.concat(segs, "/")
+end
+
 function M.open(sln_path, on_select)
   local solution = require("dotnet.core.solution")
   local project  = require("dotnet.core.project")
@@ -42,7 +55,7 @@ function M.open(sln_path, on_select)
     finder = finders.new_table({
       results     = files,
       entry_maker = function(f)
-        local display = f.proj .. "  " .. f.rel
+        local display = short(f.proj) .. "  " .. short_path(f.rel)
         return { value = f.path, display = display, ordinal = display }
       end,
     }),

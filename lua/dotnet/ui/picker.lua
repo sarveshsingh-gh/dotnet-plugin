@@ -1,6 +1,12 @@
 -- Reusable project / solution pickers used by commands.
 local M = {}
 
+local function short(name)
+  local parts = vim.split(name, "%.", { plain = true })
+  if #parts <= 2 then return name end
+  return parts[#parts - 1] .. "." .. parts[#parts]
+end
+
 local solution = require("dotnet.core.solution")
 local project  = require("dotnet.core.project")
 
@@ -35,7 +41,7 @@ function M.project(opts, cb)
     if #projs == 1 then return cb(projs[1], sln) end
     vim.ui.select(projs, {
       prompt      = opts.prompt or "Select project:",
-      format_item = function(p) return vim.fn.fnamemodify(p, ":t:r") end,
+      format_item = function(p) return short(vim.fn.fnamemodify(p, ":t:r")) end,
     }, function(p)
       if p then cb(p, sln) end
     end)
@@ -77,7 +83,7 @@ function M.target(opts, cb)
     local items = {}
     table.insert(items, { label = "⬡ " .. vim.fn.fnamemodify(sln, ":t"), path = sln, kind = "solution" })
     for _, p in ipairs(projs) do
-      table.insert(items, { label = "  " .. vim.fn.fnamemodify(p, ":t:r"), path = p, kind = "project" })
+      table.insert(items, { label = "  " .. short(vim.fn.fnamemodify(p, ":t:r")), path = p, kind = "project" })
     end
     vim.ui.select(items, {
       prompt      = opts.prompt or "Select target:",
