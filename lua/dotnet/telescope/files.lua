@@ -2,7 +2,7 @@
 local M = {}
 
 local function short(name)
-  local parts = vim.split(name, "%.", { plain = true })
+  local parts = vim.split(name, ".", { plain = true })
   if #parts <= 2 then return name end
   return parts[#parts - 1] .. "." .. parts[#parts]
 end

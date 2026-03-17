@@ -24,7 +24,7 @@ local S = {
 -- Truncate long dot-separated names (e.g. "deloitte.uk.complexapps.eforms.web")
 -- to the last 2 segments ("eforms.web"). Names with ≤2 segments are unchanged.
 local function short(name)
-  local parts = vim.split(name, "%.", { plain = true })
+  local parts = vim.split(name, ".", { plain = true })
   if #parts <= 2 then return name end
   return parts[#parts - 1] .. "." .. parts[#parts]
 end
