@@ -43,6 +43,7 @@ vim.api.nvim_set_hl(0, "DotnetTestPassed",  { link = "DiagnosticOk",   default =
 vim.api.nvim_set_hl(0, "DotnetTestFailed",  { link = "DiagnosticError", default = true })
 vim.api.nvim_set_hl(0, "DotnetTestSkipped", { link = "DiagnosticWarn",  default = true })
 vim.api.nvim_set_hl(0, "DotnetTestRunning", { link = "DiagnosticInfo",  default = true })
+vim.api.nvim_set_hl(0, "DotnetTestTotal",   { link = "DiagnosticWarn",  default = true })
 
 local HL = {
   passed    = "DotnetTestPassed",
@@ -187,10 +188,32 @@ local function render()
   local lines = {}
   local hls   = {}   -- { lnum, hl_group, col_s, col_e }
 
+  -- Count methods
+  local passed, failed, total = 0, 0, 0
+  for _, node in ipairs(S.nodes) do
+    if node.kind == "method" then
+      total  = total  + 1
+      if node.state == "passed" then passed = passed + 1
+      elseif node.state == "failed" then failed = failed + 1
+      end
+    end
+  end
+
   -- Header
-  local header = "  Test Explorer"
-  table.insert(lines, header)
+  table.insert(lines, "  Test Explorer")
   table.insert(hls, { 0, "Title", 0, -1 })
+
+  -- Stats line: "  {passed}  {failed}  {total}"
+  local p_str, f_str, t_str = tostring(passed), tostring(failed), tostring(total)
+  local stats_lnum = #lines
+  table.insert(lines, "  " .. p_str .. "  " .. f_str .. "  " .. t_str)
+  local p_col = 2
+  local f_col = p_col + #p_str + 2
+  local t_col = f_col + #f_str + 2
+  table.insert(hls, { stats_lnum, "DotnetTestPassed", p_col, p_col + #p_str })
+  table.insert(hls, { stats_lnum, "DotnetTestFailed", f_col, f_col + #f_str })
+  table.insert(hls, { stats_lnum, "DotnetTestTotal",  t_col, t_col + #t_str })
+
   table.insert(lines, string.rep("─", 30))
 
   -- Walk nodes; skip children of collapsed parent
@@ -255,7 +278,7 @@ end
 
 -- ── Cursor helpers ────────────────────────────────────────────────────────────
 
-local HEADER_OFFSET = 2  -- header line + separator
+local HEADER_OFFSET = 3  -- header + stats + separator
 
 local function cursor_node()
   if not S.win or not vim.api.nvim_win_is_valid(S.win) then return nil, nil end
