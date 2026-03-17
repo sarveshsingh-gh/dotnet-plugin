@@ -199,20 +199,18 @@ local function render()
     end
   end
 
-  -- Header
-  table.insert(lines, "  Test Explorer")
-  table.insert(hls, { 0, "Title", 0, -1 })
-
-  -- Stats line: "  {passed}  {failed}  {total}"
+  -- Header with inline stats: "  Test Explorer   0  0  340"
   local p_str, f_str, t_str = tostring(passed), tostring(failed), tostring(total)
-  local stats_lnum = #lines
-  table.insert(lines, "  " .. p_str .. "  " .. f_str .. "  " .. t_str)
-  local p_col = 2
+  local prefix = "  Test Explorer   "
+  local header = prefix .. p_str .. "  " .. f_str .. "  " .. t_str
+  table.insert(lines, header)
+  table.insert(hls, { 0, "Title", 0, #prefix })
+  local p_col = #prefix
   local f_col = p_col + #p_str + 2
   local t_col = f_col + #f_str + 2
-  table.insert(hls, { stats_lnum, "DotnetTestPassed", p_col, p_col + #p_str })
-  table.insert(hls, { stats_lnum, "DotnetTestFailed", f_col, f_col + #f_str })
-  table.insert(hls, { stats_lnum, "DotnetTestTotal",  t_col, t_col + #t_str })
+  table.insert(hls, { 0, "DotnetTestPassed", p_col, p_col + #p_str })
+  table.insert(hls, { 0, "DotnetTestFailed", f_col, f_col + #f_str })
+  table.insert(hls, { 0, "DotnetTestTotal",  t_col, t_col + #t_str })
 
   table.insert(lines, string.rep("─", 30))
 
@@ -278,7 +276,7 @@ end
 
 -- ── Cursor helpers ────────────────────────────────────────────────────────────
 
-local HEADER_OFFSET = 3  -- header + stats + separator
+local HEADER_OFFSET = 2  -- header + separator
 
 local function cursor_node()
   if not S.win or not vim.api.nvim_win_is_valid(S.win) then return nil, nil end
