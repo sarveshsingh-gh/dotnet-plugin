@@ -66,14 +66,17 @@ end
 
 -- ── Test discovery ────────────────────────────────────────────────────────────
 
+local _cache = {}   -- proj_path → { fqns }
+
 -- Parse `dotnet test --list-tests` output into a tree structure per project.
 -- Output format (one FQN per line after the header):
 --   Namespace.ClassName.MethodName
 local function discover_project(proj_path, cb)
+  if _cache[proj_path] then return cb(_cache[proj_path]) end
   local proj_dir = vim.fn.fnamemodify(proj_path, ":h")
   local lines = {}
   vim.fn.jobstart({
-    "dotnet", "test", "--list-tests", "--nologo", "-v", "q"
+    "dotnet", "test", "--list-tests", "--no-build", "--nologo", "-v", "q"
   }, {
     cwd             = proj_dir,
     stdout_buffered = true,
@@ -94,6 +97,7 @@ local function discover_project(proj_path, cb)
           table.insert(tests, t)
         end
       end
+      _cache[proj_path] = tests
       cb(tests)
     end,
   })
@@ -494,7 +498,8 @@ end
 
 -- ── Refresh (re-discover) ─────────────────────────────────────────────────────
 
-local function refresh()
+local function refresh(force)
+  if force then _cache = {} end
   if not S.sln_path then return end
   local all_projs = solution.projects(S.sln_path)
   -- only show test projects
@@ -620,7 +625,7 @@ local function setup_keymaps()
   end)
 
   -- Refresh discovery
-  map("e", function() refresh() end)
+  map("e", function() refresh(true) end)
   map("<F5>", function()
     for _, node in ipairs(S.nodes) do node.state = "none" end
     if S.sln_path then
