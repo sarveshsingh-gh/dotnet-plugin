@@ -184,11 +184,12 @@ local function build_nodes()
       -- File tree
       for _, e in ipairs(project.scan_dir(proj_dir, S.show_hidden)) do
         if e.is_dir then
+          if S.collapsed[e.path] == nil then S.collapsed[e.path] = true end
           local fic, fhl = folder_icon(S.collapsed[e.path])
           table.insert(nodes, {
             text      = fic .. short(e.name),
             indent    = 2 + e.depth, kind = "dir", path = e.path,
-            collapsed = S.collapsed[e.path] or false,
+            collapsed = S.collapsed[e.path],
             _ibytes   = #fic, _ihl = fhl,
           })
         else
