@@ -82,10 +82,16 @@ function M.annotate_keys(km)
     ["explorer.toggle"]      = km.explorer_toggle,
     ["explorer.reveal"]      = km.explorer_reveal,
     ["test_explorer.toggle"] = km.test_explorer,  -- <leader>te
+    -- run (extra)
+    ["run.profile"]          = km.run_profile,
+    -- file (extra)
+    ["file.launch_settings"] = km.launch_settings,
     -- misc
     ["jobs.list"]            = km.list_jobs,
     ["nuget.add"]            = km.nuget_add,
     ["nuget.remove"]         = km.nuget_remove,
+    -- debug
+    ["debug.launch"]         = km.debug_launch,
     -- debug F-keys (hardcoded — set in keymaps.lua)
     ["debug.continue"]       = "<F5>",
     ["debug.stop"]           = "<S-F5>",

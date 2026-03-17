@@ -31,6 +31,9 @@ function M.setup(km)
   bind(km.test_explorer,   function() require("dotnet.ui.test_explorer").toggle() end,            "Dotnet test explorer")
   bind(km.nuget_add,       function() require("dotnet.commands.init").run("nuget.add") end,       "Dotnet NuGet add")
   bind(km.nuget_remove,    function() require("dotnet.commands.init").run("nuget.remove") end,    "Dotnet NuGet remove")
+  bind(km.run_profile,     function() require("dotnet.commands.init").run("run.profile") end,     "Dotnet run with launch profile")
+  bind(km.debug_launch,    function() require("dotnet.commands.init").run("debug.launch") end,    "Dotnet debug")
+  bind(km.launch_settings, function() require("dotnet.commands.init").run("file.launch_settings") end, "Dotnet add launchSettings.json")
 
   -- VS-style debug F-keys
   local ok, dap = pcall(require, "dap")

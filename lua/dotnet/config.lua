@@ -71,6 +71,9 @@ M.defaults = {
     test_explorer    = "<leader>te",
     nuget_add        = "<leader>npa",
     nuget_remove     = "<leader>npr",
+    run_profile      = "<leader>nrp",
+    debug_launch     = "<leader>nd",
+    launch_settings  = "<leader>nL",
   },
 }
 

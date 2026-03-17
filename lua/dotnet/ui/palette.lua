@@ -31,15 +31,20 @@ function M.open(opts)
     finder = finders.new_table({
       results     = cmds,
       entry_maker = function(c)
-        local left  = string.format("%-2s%-30s", c.icon or "  ", c.desc)
-        local tag   = c.key or ""
-        local full  = left .. "  " .. tag
-        local hl_start = #left + 2
+        local icon = c.icon or "  "
+        local desc = string.format("%-30s", c.desc)
+        local cat  = string.format("%-10s", "[" .. (c.category or "") .. "]")
+        local key  = c.key or ""
+        local full = icon .. desc .. "  " .. cat .. "  " .. key
+
+        local cat_start = #icon + #desc + 2
+        local key_start = cat_start + #cat + 2
         return {
           value   = c,
           display = function()
             return full, {
-              { { hl_start, hl_start + #tag }, "Comment" },
+              { { cat_start, cat_start + #cat }, "Type"    },
+              { { key_start, key_start + #key }, "Comment" },
             }
           end,
           ordinal = (c.category or "") .. " " .. c.desc,
