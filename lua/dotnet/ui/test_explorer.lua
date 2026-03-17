@@ -56,6 +56,14 @@ local HL = {
   project   = "Statement",
 }
 
+-- ── Helpers ───────────────────────────────────────────────────────────────────
+
+local function short(name)
+  local parts = vim.split(name, "%.", { plain = true })
+  if #parts <= 2 then return name end
+  return parts[#parts - 1] .. "." .. parts[#parts]
+end
+
 -- ── Test discovery ────────────────────────────────────────────────────────────
 
 -- Parse `dotnet test --list-tests` output into a tree structure per project.
@@ -113,7 +121,7 @@ local function fqns_to_nodes(proj_path, fqns)
   end
 
   local nodes = {}
-  local proj_name = vim.fn.fnamemodify(proj_path, ":t:r")
+  local proj_name = short(vim.fn.fnamemodify(proj_path, ":t:r"))
   table.insert(nodes, {
     depth     = 1,
     kind      = "project",
@@ -128,7 +136,7 @@ local function fqns_to_nodes(proj_path, fqns)
     table.insert(nodes, {
       depth     = 2,
       kind      = "namespace",
-      label     = ns ~= "" and ns or "(global)",
+      label     = ns ~= "" and short(ns) or "(global)",
       proj      = proj_path,
       fqn       = nil,
       state     = "none",

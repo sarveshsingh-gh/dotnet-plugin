@@ -19,6 +19,16 @@ local S = {
   show_hidden = false,
 }
 
+-- ── Helpers ───────────────────────────────────────────────────────────────────
+
+-- Truncate long dot-separated names (e.g. "deloitte.uk.complexapps.eforms.web")
+-- to the last 2 segments ("eforms.web"). Names with ≤2 segments are unchanged.
+local function short(name)
+  local parts = vim.split(name, "%.", { plain = true })
+  if #parts <= 2 then return name end
+  return parts[#parts - 1] .. "." .. parts[#parts]
+end
+
 -- ── Icons ─────────────────────────────────────────────────────────────────────
 
 local function g(cp) return vim.fn.nr2char(cp, 1) end
@@ -122,7 +132,7 @@ local function build_nodes()
     local pio       = proj_icon_for(proj_path)
 
     table.insert(nodes, {
-      text      = pio .. proj_name,
+      text      = pio .. short(proj_name),
       indent    = 1, kind = "project", path = proj_path, dir = proj_dir,
       collapsed = is_coll,
       _ibytes   = #pio, _ihl = nil,
@@ -175,7 +185,7 @@ local function build_nodes()
         if e.is_dir then
           local fic, fhl = folder_icon(S.collapsed[e.path])
           table.insert(nodes, {
-            text      = fic .. e.name,
+            text      = fic .. short(e.name),
             indent    = 2 + e.depth, kind = "dir", path = e.path,
             collapsed = S.collapsed[e.path] or false,
             _ibytes   = #fic, _ihl = fhl,
