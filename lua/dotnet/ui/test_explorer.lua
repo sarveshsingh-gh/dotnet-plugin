@@ -171,7 +171,7 @@ local function fqns_to_nodes(proj_path, fqns)
         proj      = proj_path,
         fqn       = (ns ~= "" and (ns .. ".") or "") .. cls,
         state     = "none",
-        collapsed = false,
+        collapsed = true,
       })
       table.sort(ns_map[ns][cls], function(a, b) return a.label < b.label end)
       for _, m in ipairs(ns_map[ns][cls]) do
