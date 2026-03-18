@@ -314,22 +314,81 @@ end
 
 local function do_outdated(proj_path)
   local cwd = vim.fn.fnamemodify(proj_path, ":h")
+  require("dotnet.notify").info("Checking for outdated packages…")
   runner.bg({ "dotnet", "list", "package", "--outdated" }, {
-    cwd   = cwd,
-    label = "NuGet outdated",
-    on_exit = function(code, stdout, stderr)
-      local result = {}
+    cwd          = cwd,
+    label        = "NuGet outdated",
+    notify_success = false,
+    on_exit = function(_, stdout, stderr)
+      -- parse lines like:  > PackageName   requested   resolved   latest
+      local pkgs = {}
       local lines = vim.list_extend(vim.deepcopy(stdout or {}), stderr or {})
       for _, l in ipairs(lines) do
-        if l:match("^%s*>") then
-          table.insert(result, vim.trim(l))
+        local name, cur, latest = l:match("^%s*>%s+(%S+)%s+%S+%s+(%S+)%s+(%S+)")
+        if name then
+          table.insert(pkgs, { name = name, version = cur, latest = latest })
         end
       end
-      if #result == 0 then
-        require("dotnet.notify").info("All packages up to date")
-      else
-        require("dotnet.notify").warn("Outdated packages:\n" .. table.concat(result, "\n"))
+
+      if #pkgs == 0 then
+        require("dotnet.notify").info("All packages are up to date")
+        return
       end
+
+      local ok_p,  pickers   = pcall(require, "telescope.pickers")
+      local ok_f,  finders   = pcall(require, "telescope.finders")
+      local ok_c,  conf      = pcall(require, "telescope.config")
+      local ok_a,  actions   = pcall(require, "telescope.actions")
+      local ok_as, act_state = pcall(require, "telescope.actions.state")
+      if not (ok_p and ok_f and ok_c and ok_a and ok_as) then return end
+
+      local function upgrade(p)
+        runner.bg({ "dotnet", "add", "package", p.name, "--version", p.latest }, {
+          cwd   = cwd,
+          label = "NuGet upgrade " .. p.name .. " → " .. p.latest,
+        })
+      end
+
+      local function remove(p)
+        runner.bg({ "dotnet", "remove", "package", p.name }, {
+          cwd   = cwd,
+          label = "NuGet remove " .. p.name,
+        })
+      end
+
+      vim.schedule(function()
+        pickers.new({}, {
+          prompt_title = "Outdated Packages  <CR> upgrade · <C-d> remove",
+          finder = finders.new_table({
+            results = pkgs,
+            entry_maker = function(p)
+              return {
+                value   = p,
+                display = string.format("%-45s %-18s → %s", p.name, p.version, p.latest),
+                ordinal = p.name,
+              }
+            end,
+          }),
+          sorter = conf.values.generic_sorter({}),
+          attach_mappings = function(prompt_bufnr, map)
+            actions.select_default:replace(function()
+              local sel = act_state.get_selected_entry()
+              actions.close(prompt_bufnr)
+              if sel then upgrade(sel.value) end
+            end)
+
+            local function do_remove()
+              local sel = act_state.get_selected_entry()
+              actions.close(prompt_bufnr)
+              if sel then remove(sel.value) end
+            end
+            map("i", "<C-d>", do_remove)
+            map("n", "<C-d>", do_remove)
+
+            return true
+          end,
+        }):find()
+      end)
     end,
   })
 end
