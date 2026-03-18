@@ -25,7 +25,7 @@ reg("build.quickfix", {
 })
 
 reg("build.restore", {
-  icon = " ",
+  icon = "󰑓 ",
   desc = "Restore packages",
   run  = function()
     picker.target({ prompt = "Restore target:" }, function(target)

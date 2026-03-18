@@ -71,11 +71,22 @@ M.defaults = {
     test_explorer    = "<leader>te",
     nuget_add        = "<leader>npa",
     nuget_remove     = "<leader>npr",
+    nuget_list       = "<leader>npl",
+    nuget_outdated   = "<leader>npo",
     run_profile      = "<leader>nrp",
     debug_launch     = "<leader>nd",
     launch_settings  = "<leader>nL",
     run_func         = "<leader>naf",
     debug_func       = "<leader>naF",
+    -- EF Core
+    ef_migration_add    = "<leader>nema",
+    ef_migration_remove = "<leader>nemr",
+    ef_migration_list   = "<leader>neml",
+    ef_migration_script = "<leader>nems",
+    ef_db_update        = "<leader>nedu",
+    ef_db_update_to     = "<leader>nedU",
+    ef_db_drop          = "<leader>nedd",
+    ef_scaffold         = "<leader>nesc",
   },
 }
 

@@ -121,7 +121,7 @@ reg("file.fix_namespace", {
 })
 
 reg("file.launch_settings", {
-  icon = " ",
+  icon = "󰒓 ",
   desc = "Add launchSettings.json",
   run  = function()
     picker.runnable({ prompt = "Add launchSettings.json to:" }, function(csproj)

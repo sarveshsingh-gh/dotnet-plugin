@@ -26,25 +26,32 @@ function M.open(opts)
 
   local cmds = require("dotnet.commands.init").all()
 
+  -- Pad string to `w` display columns using strdisplaywidth
+  local function rpad(s, w)
+    local dw = vim.fn.strdisplaywidth(s)
+    return dw < w and (s .. string.rep(" ", w - dw)) or s
+  end
+
   pickers.new({}, {
     prompt_title = " Dotnet",
     finder = finders.new_table({
       results     = cmds,
       entry_maker = function(c)
-        local icon = c.icon or "  "
-        local desc = string.format("%-30s", c.desc)
-        local cat  = string.format("%-10s", "[" .. (c.category or "") .. "]")
-        local key  = c.key or ""
-        local full = icon .. desc .. "  " .. cat .. "  " .. key
+        local icon_s = rpad(c.icon or "  ", 3)   -- nerd font = 2 cols + 1 space
+        local desc_s = rpad(c.desc, 46)
+        local cat_s  = rpad("[" .. (c.category or "") .. "]", 12)
+        local key_s  = c.key or ""
+        local full   = icon_s .. desc_s .. cat_s .. "  " .. key_s
 
-        local cat_start = #icon + #desc + 2
-        local key_start = cat_start + #cat + 2
+        -- highlights use byte offsets into `full`
+        local cat_b = #icon_s + #desc_s
+        local key_b = cat_b + #cat_s + 2
         return {
           value   = c,
           display = function()
             return full, {
-              { { cat_start, cat_start + #cat }, "Type"    },
-              { { key_start, key_start + #key }, "Comment" },
+              { { cat_b, cat_b + #cat_s },       "Type"    },
+              { { key_b, key_b + #key_s },       "Comment" },
             }
           end,
           ordinal = (c.category or "") .. " " .. c.desc,

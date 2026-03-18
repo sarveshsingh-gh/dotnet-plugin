@@ -92,6 +92,17 @@ function M.annotate_keys(km)
     ["jobs.list"]            = km.list_jobs,
     ["nuget.add"]            = km.nuget_add,
     ["nuget.remove"]         = km.nuget_remove,
+    ["nuget.list"]           = km.nuget_list,
+    ["nuget.outdated"]       = km.nuget_outdated,
+    -- EF Core
+    ["ef.migration.add"]     = km.ef_migration_add,
+    ["ef.migration.remove"]  = km.ef_migration_remove,
+    ["ef.migration.list"]    = km.ef_migration_list,
+    ["ef.migration.script"]  = km.ef_migration_script,
+    ["ef.db.update"]         = km.ef_db_update,
+    ["ef.db.update_to"]      = km.ef_db_update_to,
+    ["ef.db.drop"]           = km.ef_db_drop,
+    ["ef.scaffold"]          = km.ef_scaffold,
     -- debug
     ["debug.launch"]         = km.debug_launch,
     -- debug F-keys (hardcoded — set in keymaps.lua)

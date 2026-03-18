@@ -20,7 +20,7 @@ end
 -- ── Migrations ───────────────────────────────────────────────────────────────
 
 reg("ef.migration.add", {
-  icon = " ",
+  icon = "󰆒 ",
   desc = "EF: Add migration",
   run  = function()
     pick_proj_then("Add migration to project:", function(proj)
@@ -34,7 +34,7 @@ reg("ef.migration.add", {
 })
 
 reg("ef.migration.remove", {
-  icon = " ",
+  icon = "󰆓 ",
   desc = "EF: Remove last migration",
   run  = function()
     pick_proj_then("Remove last migration from:", function(proj)
@@ -44,7 +44,7 @@ reg("ef.migration.remove", {
 })
 
 reg("ef.migration.list", {
-  icon = " ",
+  icon = "󰋙 ",
   desc = "EF: List migrations",
   run  = function()
     pick_proj_then("List migrations for:", function(proj)
@@ -54,7 +54,7 @@ reg("ef.migration.list", {
 })
 
 reg("ef.migration.script", {
-  icon = " ",
+  icon = "󰦽 ",
   desc = "EF: Generate SQL script",
   run  = function()
     pick_proj_then("Generate SQL script for:", function(proj)

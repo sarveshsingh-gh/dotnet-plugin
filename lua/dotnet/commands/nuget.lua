@@ -229,19 +229,20 @@ local function do_add_package(proj_path)
 end
 
 local function do_remove_package(proj_path)
-  -- Read current packages from csproj
   local ok, props = pcall(require("dotnet.core.project").deps, proj_path)
   local pkgs = (ok and props and props.pkgs) or {}
   if #pkgs == 0 then
     require("dotnet.notify").info("No packages found in project")
     return
   end
-  vim.ui.select(pkgs, { prompt = "Remove package:" }, function(choice)
+  vim.ui.select(pkgs, {
+    prompt      = "Remove package:",
+    format_item = function(p) return p.name .. "  " .. p.version end,
+  }, function(choice)
     if not choice then return end
-    runner.bg({ "dotnet", "remove", "package", choice }, {
+    runner.bg({ "dotnet", "remove", "package", choice.name }, {
       cwd   = vim.fn.fnamemodify(proj_path, ":h"),
-      label = "NuGet remove " .. choice,
-      notify = true,
+      label = "NuGet remove " .. choice.name,
     })
   end)
 end
@@ -251,8 +252,9 @@ local function do_list_packages(proj_path)
   runner.bg({ "dotnet", "list", "package" }, {
     cwd   = cwd,
     label = "NuGet list",
-    on_exit = function(lines)
+    on_exit = function(code, stdout, stderr)
       local result = {}
+      local lines = vim.list_extend(vim.deepcopy(stdout or {}), stderr or {})
       for _, l in ipairs(lines) do
         if l:match("^%s*>") then
           table.insert(result, vim.trim(l))
@@ -261,9 +263,7 @@ local function do_list_packages(proj_path)
       if #result == 0 then
         require("dotnet.notify").info("No packages")
       else
-        vim.schedule(function()
-          require("dotnet.notify").info("Packages:\n" .. table.concat(result, "\n"))
-        end)
+        require("dotnet.notify").info("Packages:\n" .. table.concat(result, "\n"))
       end
     end,
   })
@@ -274,8 +274,9 @@ local function do_outdated(proj_path)
   runner.bg({ "dotnet", "list", "package", "--outdated" }, {
     cwd   = cwd,
     label = "NuGet outdated",
-    on_exit = function(lines)
+    on_exit = function(code, stdout, stderr)
       local result = {}
+      local lines = vim.list_extend(vim.deepcopy(stdout or {}), stderr or {})
       for _, l in ipairs(lines) do
         if l:match("^%s*>") then
           table.insert(result, vim.trim(l))
@@ -284,10 +285,7 @@ local function do_outdated(proj_path)
       if #result == 0 then
         require("dotnet.notify").info("All packages up to date")
       else
-        vim.schedule(function()
-          local msg = table.concat(result, "\n")
-          require("dotnet.notify").warn("Outdated packages:\n" .. msg)
-        end)
+        require("dotnet.notify").warn("Outdated packages:\n" .. table.concat(result, "\n"))
       end
     end,
   })
