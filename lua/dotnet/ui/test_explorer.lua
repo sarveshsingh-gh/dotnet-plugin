@@ -532,9 +532,18 @@ end
 
 -- ── Refresh (re-discover) ─────────────────────────────────────────────────────
 
+local _refresh_rev = 0  -- incremented each refresh; stale callbacks self-discard
+
 local function refresh(force)
-  if force then _cache = {} end
+  if force then
+    _cache = {}
+    require("dotnet.notify").info("Discovering tests…")
+  end
   if not S.sln_path then return end
+
+  _refresh_rev = _refresh_rev + 1
+  local rev = _refresh_rev
+
   local all_projs = solution.projects(S.sln_path)
   -- only show test projects
   local proj_m = require("dotnet.core.project")
@@ -547,22 +556,12 @@ local function refresh(force)
     return
   end
 
-  -- Insert solution root
-  S.nodes = {{
-    depth     = 0,
-    kind      = "solution",
-    label     = vim.fn.fnamemodify(S.sln_path, ":t:r"),
-    proj      = nil,
-    fqn       = nil,
-    state     = "none",
-    collapsed = false,
-  }}
-
   local pending = #projs
   local all_nodes = {}
 
   for _, proj in ipairs(projs) do
     discover_project(proj, function(fqns)
+      if rev ~= _refresh_rev then return end  -- stale, a newer refresh started
       local nodes = fqns_to_nodes(proj, fqns)
       for _, n in ipairs(nodes) do
         n.depth = n.depth + 1  -- shift down one level (under solution)
@@ -571,6 +570,17 @@ local function refresh(force)
       pending = pending - 1
       if pending == 0 then
         vim.schedule(function()
+          if rev ~= _refresh_rev then return end  -- stale
+          -- Build S.nodes fresh here, not before the async jobs, to avoid doubling
+          S.nodes = {{
+            depth     = 0,
+            kind      = "solution",
+            label     = vim.fn.fnamemodify(S.sln_path, ":t:r"),
+            proj      = nil,
+            fqn       = nil,
+            state     = "none",
+            collapsed = false,
+          }}
           for _, n in ipairs(all_nodes) do
             table.insert(S.nodes, n)
           end
