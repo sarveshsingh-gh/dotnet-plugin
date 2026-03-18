@@ -4,19 +4,6 @@ local picker   = require("dotnet.ui.picker")
 
 local function reg(id, def) cmd.register(id, vim.tbl_extend("force", { category = "solution" }, def)) end
 
-reg("solution.add_project", {
-  icon = "󰐗 ",
-  desc = "Add project to solution",
-  run  = function()
-    picker.solution(function(sln)
-      vim.ui.input({ prompt = "Project path (.csproj): " }, function(path)
-        if path and path ~= "" then
-          solution.add_project(sln, vim.fn.fnamemodify(path, ":p"))
-        end
-      end)
-    end)
-  end,
-})
 
 reg("solution.remove_project", {
   icon = "󰐘 ",
