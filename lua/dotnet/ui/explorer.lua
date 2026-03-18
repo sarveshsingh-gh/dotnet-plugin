@@ -435,7 +435,7 @@ local function action_remove_package(node)
     runner.bg({ "dotnet", "remove", "package", node._pkg_name }, {
       cwd   = proj_dir,
       label = "Remove " .. node._pkg_name,
-      on_exit = function(code) if code == 0 then refresh() end end,
+      on_exit = function() refresh() end,  -- always refresh regardless of exit code
     })
   end)
 end

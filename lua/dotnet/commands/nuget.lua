@@ -241,8 +241,9 @@ local function do_remove_package(proj_path)
   }, function(choice)
     if not choice then return end
     runner.bg({ "dotnet", "remove", "package", choice.name }, {
-      cwd   = vim.fn.fnamemodify(proj_path, ":h"),
-      label = "NuGet remove " .. choice.name,
+      cwd      = vim.fn.fnamemodify(proj_path, ":h"),
+      label    = "NuGet remove " .. choice.name,
+      on_exit  = function() pcall(function() require("dotnet.ui.explorer").refresh_if_open() end) end,
     })
   end)
 end
@@ -264,18 +265,23 @@ local function do_list_packages(proj_path)
 
   local cwd = vim.fn.fnamemodify(proj_path, ":h")
 
+  local function explorer_refresh()
+    pcall(function() require("dotnet.ui.explorer").refresh_if_open() end)
+  end
+
   local function remove(sel)
     runner.bg({ "dotnet", "remove", "package", sel.name }, {
-      cwd   = cwd,
-      label = "NuGet remove " .. sel.name,
+      cwd     = cwd,
+      label   = "NuGet remove " .. sel.name,
+      on_exit = function() explorer_refresh() end,
     })
   end
 
   local function upgrade(sel)
-    -- dotnet add package without --version pulls the latest
     runner.bg({ "dotnet", "add", "package", sel.name }, {
-      cwd   = cwd,
-      label = "NuGet upgrade " .. sel.name,
+      cwd     = cwd,
+      label   = "NuGet upgrade " .. sel.name,
+      on_exit = function() explorer_refresh() end,
     })
   end
 
@@ -342,17 +348,23 @@ local function do_outdated(proj_path)
       local ok_as, act_state = pcall(require, "telescope.actions.state")
       if not (ok_p and ok_f and ok_c and ok_a and ok_as) then return end
 
+      local function exp_refresh()
+        pcall(function() require("dotnet.ui.explorer").refresh_if_open() end)
+      end
+
       local function upgrade(p)
         runner.bg({ "dotnet", "add", "package", p.name, "--version", p.latest }, {
-          cwd   = cwd,
-          label = "NuGet upgrade " .. p.name .. " → " .. p.latest,
+          cwd     = cwd,
+          label   = "NuGet upgrade " .. p.name .. " → " .. p.latest,
+          on_exit = function() exp_refresh() end,
         })
       end
 
       local function remove(p)
         runner.bg({ "dotnet", "remove", "package", p.name }, {
-          cwd   = cwd,
-          label = "NuGet remove " .. p.name,
+          cwd     = cwd,
+          label   = "NuGet remove " .. p.name,
+          on_exit = function() exp_refresh() end,
         })
       end
 
