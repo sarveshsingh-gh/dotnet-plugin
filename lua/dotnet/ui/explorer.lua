@@ -557,7 +557,7 @@ local DISPATCH = {
 
   ["a"] = function(node)
     if node.kind == "solution" then
-      require("dotnet.commands.init").run("solution.add_project")
+      require("dotnet.commands.init").run("solution.new_project")
     end
   end,
 
@@ -712,6 +712,10 @@ end
 -- ── Public API ────────────────────────────────────────────────────────────────
 
 local _saved_showtabline = nil
+
+function M.refresh_if_open()
+  if S.win and vim.api.nvim_win_is_valid(S.win) then refresh() end
+end
 
 function M.set_sln(sln_path)
   S.sln_path = sln_path

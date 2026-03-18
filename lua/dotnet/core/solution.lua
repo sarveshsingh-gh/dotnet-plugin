@@ -42,20 +42,36 @@ function M.projects(sln_path)
   return vim.tbl_filter(function(p) return vim.fn.filereadable(p) == 1 end, paths)
 end
 
+local function explorer_refresh()
+  local ok, exp = pcall(require, "dotnet.ui.explorer")
+  if ok then pcall(exp.refresh_if_open) end
+end
+
 --- Add a project to the solution (runs dotnet sln add).
 function M.add_project(sln_path, proj_path, cb)
   local name = vim.fn.fnamemodify(proj_path, ":t:r")
   require("dotnet.core.runner").bg(
     { "dotnet", "sln", sln_path, "add", proj_path },
-    { label = "Adding " .. name .. " to solution", on_exit = function(code) if code == 0 and cb then cb() end end }
+    { label = "Adding " .. name .. " to solution", on_exit = function(code)
+        if code == 0 then
+          explorer_refresh()
+          if cb then cb() end
+        end
+      end }
   )
 end
 
 --- Remove a project from the solution (runs dotnet sln remove).
 function M.remove_project(sln_path, proj_path, cb)
+  local name = vim.fn.fnamemodify(proj_path, ":t:r")
   require("dotnet.core.runner").bg(
     { "dotnet", "sln", sln_path, "remove", proj_path },
-    { label = "Remove project from solution", on_exit = function(code) if code == 0 and cb then cb() end end }
+    { label = "Removing " .. name .. " from solution", on_exit = function(code)
+        if code == 0 then
+          explorer_refresh()
+          if cb then cb() end
+        end
+      end }
   )
 end
 
