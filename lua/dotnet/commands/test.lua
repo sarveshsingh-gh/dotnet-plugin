@@ -19,12 +19,14 @@ reg("test.project", {
   desc = "Test project",
   run  = function()
     -- Auto-detect from current buffer; fall back to picker
-    local file = vim.api.nvim_buf_get_name(0)
+    local is_win = vim.fn.has("win32") == 1
+    local file = vim.fn.fnamemodify(vim.api.nvim_buf_get_name(0), ":p"):gsub("\\", "/")
     local sln  = require("dotnet").sln()
     if sln and file ~= "" then
       for _, p in ipairs(require("dotnet.core.solution").projects(sln)) do
-        local dir = vim.fn.fnamemodify(p, ":h") .. "/"
-        if file:sub(1, #dir) == dir then
+        local dir = vim.fn.fnamemodify(p, ":h"):gsub("\\", "/") .. "/"
+        local a, b = is_win and file:lower() or file, is_win and dir:lower() or dir
+        if a:sub(1, #b) == b then
           runner.test(p)
           return
         end

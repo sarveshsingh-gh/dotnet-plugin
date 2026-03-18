@@ -79,11 +79,13 @@ function M.setup(user_opts)
     pattern  = "cs",
     callback = function(ev)
       local function proj_for_buf()
-        local file = vim.api.nvim_buf_get_name(ev.buf)
+        local is_win = vim.fn.has("win32") == 1
+        local file = vim.fn.fnamemodify(vim.api.nvim_buf_get_name(ev.buf), ":p"):gsub("\\", "/")
         if not _sln or file == "" then return nil end
         for _, p in ipairs(require("dotnet.core.solution").projects(_sln)) do
-          local dir = vim.fn.fnamemodify(p, ":h") .. "/"
-          if file:sub(1, #dir) == dir then return p end
+          local dir = vim.fn.fnamemodify(p, ":h"):gsub("\\", "/") .. "/"
+          local a, b = is_win and file:lower() or file, is_win and dir:lower() or dir
+          if a:sub(1, #b) == b then return p end
         end
       end
 
