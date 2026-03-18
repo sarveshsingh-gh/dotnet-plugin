@@ -44,6 +44,7 @@ reg("solution.new_project", {
       { value = "classlib", display = "Class Library"           },
       { value = "console",  display = "Console Application"     },
       { value = "worker",   display = "Worker Service"          },
+      { value = "func",     display = "Azure Functions"         },
       { value = "xunit",    display = "xUnit Test Project"      },
       { value = "nunit",    display = "NUnit Test Project"      },
     }
