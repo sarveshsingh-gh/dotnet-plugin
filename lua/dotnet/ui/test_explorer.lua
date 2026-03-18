@@ -89,13 +89,28 @@ local function discover_project(proj_path, cb)
       end
     end,
     on_exit = function()
-      -- A valid FQN contains only word chars and dots, starts with a letter,
-      -- has at least two dot-separated segments. Rejects paths, version strings, etc.
+      -- Collect test FQNs that appear after the "The following Tests are available:" header.
+      -- Parameterized tests may contain '(', ')', ',', '"', '<', '>' in their names.
       local tests = {}
+      local after_header = false
       for _, l in ipairs(lines) do
         local t = vim.trim(l)
-        if t:match("^[%a_][%w_]*%.[%w_%.]+$") then
-          table.insert(tests, t)
+        if t:find("The following Tests are available", 1, true) then
+          after_header = true
+        elseif after_header and t ~= "" then
+          -- Must start with a letter/underscore and contain at least one dot segment
+          if t:match("^[%a_][%w_%.%(%),<>\"' %-]*%.[%w_][%w_%(%),<>\"' %-]*$") then
+            table.insert(tests, t)
+          end
+        end
+      end
+      -- Fallback: if header was never found use the old heuristic (plain FQNs only)
+      if not after_header then
+        for _, l in ipairs(lines) do
+          local t = vim.trim(l)
+          if t:match("^[%a_][%w_]*%.[%w_%.]+$") then
+            table.insert(tests, t)
+          end
         end
       end
       _cache[proj_path] = tests
