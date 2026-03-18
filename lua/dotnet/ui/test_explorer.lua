@@ -90,21 +90,18 @@ local function discover_project(proj_path, cb)
     end,
     on_exit = function()
       -- Collect test FQNs that appear after the "The following Tests are available:" header.
-      -- Parameterized tests may contain '(', ')', ',', '"', '<', '>' in their names.
+      -- Parameterized tests may contain '(', ')', ',', '"', '<', '>' etc. in their names.
       local tests = {}
       local after_header = false
       for _, l in ipairs(lines) do
         local t = vim.trim(l)
         if t:find("The following Tests are available", 1, true) then
           after_header = true
-        elseif after_header and t ~= "" then
-          -- Must start with a letter/underscore and contain at least one dot segment
-          if t:match("^[%a_][%w_%.%(%),<>\"' %-]*%.[%w_][%w_%(%),<>\"' %-]*$") then
-            table.insert(tests, t)
-          end
+        elseif after_header and t ~= "" and t:find(".", 1, true) then
+          table.insert(tests, t)
         end
       end
-      -- Fallback: if header was never found use the old heuristic (plain FQNs only)
+      -- Fallback: header not emitted (e.g. different verbosity) — use heuristic
       if not after_header then
         for _, l in ipairs(lines) do
           local t = vim.trim(l)
