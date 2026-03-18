@@ -613,6 +613,29 @@ local DISPATCH = {
     pcall(vim.api.nvim_win_set_cursor, S.win, { row, 0 })
   end,
 
+  -- Vim-style: h = collapse, l = expand / open file
+  ["h"] = function(node)
+    local leaf = node.kind == "file" or node.kind == "pkg" or node.kind == "projref"
+    if not leaf then
+      S.collapsed[node.path] = true
+      local row = vim.api.nvim_win_get_cursor(S.win)[1]
+      refresh()
+      pcall(vim.api.nvim_win_set_cursor, S.win, { row, 0 })
+    end
+  end,
+
+  ["l"] = function(node)
+    local leaf = node.kind == "file" or node.kind == "pkg" or node.kind == "projref"
+    if leaf then
+      if node.kind == "file" then action_open_file(node) end
+    else
+      S.collapsed[node.path] = false
+      local row = vim.api.nvim_win_get_cursor(S.win)[1]
+      refresh()
+      pcall(vim.api.nvim_win_set_cursor, S.win, { row, 0 })
+    end
+  end,
+
   ["H"] = function()
     S.show_hidden = not S.show_hidden
     refresh()

@@ -703,6 +703,21 @@ local function setup_keymaps()
       render()
     end
   end)
+  -- Vim-style: h = collapse, l = expand
+  map("h", function()
+    local node = cursor_node()
+    if node and node.kind ~= "method" then
+      node.collapsed = true
+      render()
+    end
+  end)
+  map("l", function()
+    local node = cursor_node()
+    if node and node.kind ~= "method" then
+      node.collapsed = false
+      render()
+    end
+  end)
   -- Collapse / expand ALL
   map("zM", function()
     for _, node in ipairs(S.nodes) do
