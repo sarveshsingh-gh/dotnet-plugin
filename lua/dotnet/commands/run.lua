@@ -46,7 +46,10 @@ reg("run.func", {
   icon = "󰡱 ",
   desc = "Start Azure Function (func start)",
   run  = function()
-    local project = require("dotnet.core.project")
+    if vim.fn.executable("func") == 0 then
+      require("dotnet.notify").warn("Azure Functions Core Tools ('func') not found in PATH")
+      return
+    end
     picker.runnable({ prompt = "Start Azure Function:" }, function(proj)
       local proj_dir = vim.fn.fnamemodify(proj, ":h")
       runner.term({ "func", "start" }, {
@@ -61,6 +64,10 @@ reg("run.func_debug", {
   icon = "󰡱 ",
   desc = "Debug Azure Function (func start + attach)",
   run  = function()
+    if vim.fn.executable("func") == 0 then
+      require("dotnet.notify").warn("Azure Functions Core Tools ('func') not found in PATH")
+      return
+    end
     picker.runnable({ prompt = "Debug Azure Function:" }, function(proj)
       local proj_dir = vim.fn.fnamemodify(proj, ":h")
       local name     = vim.fn.fnamemodify(proj, ":t:r")
