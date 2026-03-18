@@ -44,9 +44,10 @@ end
 
 --- Add a project to the solution (runs dotnet sln add).
 function M.add_project(sln_path, proj_path, cb)
+  local name = vim.fn.fnamemodify(proj_path, ":t:r")
   require("dotnet.core.runner").bg(
     { "dotnet", "sln", sln_path, "add", proj_path },
-    { label = "Add project to solution", on_exit = function(code) if code == 0 and cb then cb() end end }
+    { label = "Adding " .. name .. " to solution", on_exit = function(code) if code == 0 and cb then cb() end end }
   )
 end
 
