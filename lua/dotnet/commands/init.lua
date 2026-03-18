@@ -90,6 +90,7 @@ function M.annotate_keys(km)
     ["file.launch_settings"] = km.launch_settings,
     -- misc
     ["jobs.list"]            = km.list_jobs,
+    ["solution.remove_project"] = km.remove_project,
     ["nuget.add"]            = km.nuget_add,
     ["nuget.remove"]         = km.nuget_remove,
     ["nuget.list"]           = km.nuget_list,

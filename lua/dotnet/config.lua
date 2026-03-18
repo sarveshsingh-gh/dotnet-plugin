@@ -78,6 +78,8 @@ M.defaults = {
     launch_settings  = "<leader>nL",
     run_func         = "<leader>naf",
     debug_func       = "<leader>naF",
+    -- solution
+    remove_project      = "<leader>nsr",
     -- EF Core
     ef_migration_add    = "<leader>nema",
     ef_migration_remove = "<leader>nemr",

@@ -10,12 +10,14 @@ reg("solution.remove_project", {
   desc = "Remove project from solution",
   run  = function()
     picker.project({ prompt = "Remove project:" }, function(proj, sln)
-      vim.ui.input({ prompt = "Confirm remove '" .. vim.fn.fnamemodify(proj, ":t:r") .. "'? [y/N]: " },
-        function(ans)
-          if ans and ans:lower() == "y" then
-            solution.remove_project(sln, proj)
-          end
-        end)
+      local name = vim.fn.fnamemodify(proj, ":t:r")
+      vim.ui.select({ "Yes, remove it", "Cancel" }, {
+        prompt = "Remove '" .. name .. "' from solution?",
+      }, function(choice)
+        if choice and choice:match("^Yes") then
+          solution.remove_project(sln, proj)
+        end
+      end)
     end)
   end,
 })
