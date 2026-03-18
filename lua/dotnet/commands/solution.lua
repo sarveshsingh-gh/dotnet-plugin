@@ -63,9 +63,15 @@ reg("solution.new_project", {
             { label = "New project " .. name, notify_success = false,
               on_exit = function(code)
                 if code ~= 0 then return end
-                local proj_file = out .. "/" .. name .. ".csproj"
-                if vim.fn.filereadable(proj_file) == 1 then
-                  solution.add_project(sln, proj_file)
+                -- Glob for the csproj — don't assume exact filename (func template varies)
+                local found = vim.fn.glob(out .. "/**/*.csproj", false, true)
+                if not found or #found == 0 then
+                  found = vim.fn.glob(out .. "/*.csproj", false, true)
+                end
+                if found and #found > 0 then
+                  solution.add_project(sln, found[1])
+                else
+                  require("dotnet.notify").warn("Project created but .csproj not found in " .. out)
                 end
               end }
           )
