@@ -248,25 +248,68 @@ local function do_remove_package(proj_path)
 end
 
 local function do_list_packages(proj_path)
+  local ok_p,  pickers   = pcall(require, "telescope.pickers")
+  local ok_f,  finders   = pcall(require, "telescope.finders")
+  local ok_c,  conf      = pcall(require, "telescope.config")
+  local ok_a,  actions   = pcall(require, "telescope.actions")
+  local ok_as, act_state = pcall(require, "telescope.actions.state")
+  if not (ok_p and ok_f and ok_c and ok_a and ok_as) then return end
+
+  local ok_proj, props = pcall(require("dotnet.core.project").deps, proj_path)
+  local pkgs = (ok_proj and props and props.pkgs) or {}
+  if #pkgs == 0 then
+    require("dotnet.notify").info("No packages in project")
+    return
+  end
+
   local cwd = vim.fn.fnamemodify(proj_path, ":h")
-  runner.bg({ "dotnet", "list", "package" }, {
-    cwd   = cwd,
-    label = "NuGet list",
-    on_exit = function(code, stdout, stderr)
-      local result = {}
-      local lines = vim.list_extend(vim.deepcopy(stdout or {}), stderr or {})
-      for _, l in ipairs(lines) do
-        if l:match("^%s*>") then
-          table.insert(result, vim.trim(l))
-        end
+
+  local function remove(sel)
+    runner.bg({ "dotnet", "remove", "package", sel.name }, {
+      cwd   = cwd,
+      label = "NuGet remove " .. sel.name,
+    })
+  end
+
+  local function upgrade(sel)
+    -- dotnet add package without --version pulls the latest
+    runner.bg({ "dotnet", "add", "package", sel.name }, {
+      cwd   = cwd,
+      label = "NuGet upgrade " .. sel.name,
+    })
+  end
+
+  pickers.new({}, {
+    prompt_title = "NuGet Packages  <CR> remove · <C-u> upgrade",
+    finder = finders.new_table({
+      results = pkgs,
+      entry_maker = function(p)
+        return {
+          value   = p,
+          display = string.format("%-48s %s", p.name, p.version),
+          ordinal = p.name,
+        }
+      end,
+    }),
+    sorter = conf.values.generic_sorter({}),
+    attach_mappings = function(prompt_bufnr, map)
+      actions.select_default:replace(function()
+        local sel = act_state.get_selected_entry()
+        actions.close(prompt_bufnr)
+        if sel then remove(sel.value) end
+      end)
+
+      local function do_upgrade()
+        local sel = act_state.get_selected_entry()
+        actions.close(prompt_bufnr)
+        if sel then upgrade(sel.value) end
       end
-      if #result == 0 then
-        require("dotnet.notify").info("No packages")
-      else
-        require("dotnet.notify").info("Packages:\n" .. table.concat(result, "\n"))
-      end
+      map("i", "<C-u>", do_upgrade)
+      map("n", "<C-u>", do_upgrade)
+
+      return true
     end,
-  })
+  }):find()
 end
 
 local function do_outdated(proj_path)
