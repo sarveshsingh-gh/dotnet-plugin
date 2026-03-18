@@ -10,13 +10,21 @@ reg("solution.remove_project", {
   desc = "Remove project from solution",
   run  = function()
     picker.project({ prompt = "Remove project:" }, function(proj, sln)
-      local name = vim.fn.fnamemodify(proj, ":t:r")
-      vim.ui.select({ "Yes, remove it", "Cancel" }, {
-        prompt = "Remove '" .. name .. "' from solution?",
-      }, function(choice)
-        if choice and choice:match("^Yes") then
-          solution.remove_project(sln, proj)
-        end
+      local name     = vim.fn.fnamemodify(proj, ":t:r")
+      local proj_dir = vim.fn.fnamemodify(proj, ":h")
+      vim.ui.select({
+        "Remove from solution only",
+        "Remove from solution and delete from disk",
+        "Cancel",
+      }, { prompt = "Remove '" .. name .. "'?" }, function(choice)
+        if not choice or choice == "Cancel" then return end
+        local delete_disk = choice:match("delete from disk")
+        solution.remove_project(sln, proj, function()
+          if delete_disk then
+            vim.fn.delete(proj_dir, "rf")
+            require("dotnet.notify").ok("Deleted " .. proj_dir)
+          end
+        end)
       end)
     end)
   end,
