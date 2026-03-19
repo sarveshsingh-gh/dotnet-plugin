@@ -80,6 +80,20 @@ M.defaults = {
     debug_func       = "<leader>naF",
     -- solution
     remove_project      = "<leader>nsr",
+    -- Docker
+    docker_scaffold         = "<leader>ndos",
+    docker_scaffold_all     = "<leader>ndosa",
+    docker_scaffold_debug   = "<leader>ndosd",
+    docker_compose_open     = "<leader>ndco",
+    docker_compose_scaffold = "<leader>ndocs",
+    docker_build        = "<leader>ndob",
+    docker_run          = "<leader>ndor",
+    docker_ls           = "<leader>ndol",
+    docker_attach       = "<leader>ndoa",
+    docker_compose_add_db = "<leader>ndcdb",
+    docker_compose_up   = "<leader>ndcu",
+    docker_compose_down = "<leader>ndcd",
+    docker_compose_logs = "<leader>ndcl",
     -- EF Core
     ef_migration_add    = "<leader>nema",
     ef_migration_remove = "<leader>nemr",

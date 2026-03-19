@@ -54,7 +54,7 @@ function M.open(opts)
               { { key_b, key_b + #key_s },       "Comment" },
             }
           end,
-          ordinal = (c.category or "") .. " " .. c.desc,
+          ordinal = c.desc .. " " .. (c.category or ""),
         }
       end,
     }),

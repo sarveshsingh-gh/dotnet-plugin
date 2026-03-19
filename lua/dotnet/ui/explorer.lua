@@ -101,13 +101,15 @@ vim.api.nvim_set_hl(0, "DotnetSlnProject", { link = "Directory" })
 vim.api.nvim_set_hl(0, "DotnetSlnFolder",  { link = "Directory" })
 
 local KIND_HL = {
-  solution = "Title",
-  project  = "DotnetSlnProject",
-  dir      = "DotnetSlnFolder",
-  file     = "Normal",
-  deps     = "DotnetSlnFolder",
-  pkg      = "String",
-  projref  = "Type",
+  solution    = "Title",
+  project     = "DotnetSlnProject",
+  dir         = "DotnetSlnFolder",
+  file        = "Normal",
+  deps        = "DotnetSlnFolder",
+  pkg         = "String",
+  projref     = "Type",
+  docker_root = "DotnetSlnFolder",
+  docker_file = "Normal",
 }
 
 -- ── Forward declarations ───────────────────────────────────────────────────────
@@ -204,6 +206,30 @@ local function build_nodes()
         end
       end
     end
+  end
+
+  -- ── Docker section (solution-level compose files only) ──────────────────
+  local sln_dir = vim.fn.fnamemodify(sln, ":h")
+  local docker_files = {}
+
+  for _, name in ipairs({
+    "docker-compose.yml", "docker-compose.yaml",
+    "docker-compose.debug.yml", "docker-compose.override.yml",
+    "compose.yml", "compose.yaml",
+  }) do
+    if vim.fn.filereadable(sln_dir .. "/" .. name) == 1 then
+      table.insert(docker_files, { path = sln_dir .. "/" .. name, label = name })
+    end
+  end
+
+  for _, df in ipairs(docker_files) do
+    local fic, fhl = icon_for_file(df.label)
+    table.insert(nodes, {
+      text      = fic .. df.label,
+      indent    = 1, kind = "docker_file", path = df.path,
+      collapsed = false,
+      _ibytes   = #fic, _ihl = fhl,
+    })
   end
 
   return nodes
@@ -527,16 +553,16 @@ end
 
 local DISPATCH = {
   ["<cr>"] = function(node)
-    local leaf = node.kind == "file" or node.kind == "pkg" or node.kind == "projref"
+    local leaf = node.kind == "file" or node.kind == "pkg" or node.kind == "projref" or node.kind == "docker_file"
     if leaf then
-      if node.kind == "file" then action_open_file(node) end
+      action_open_file(node)
     else
       action_toggle_fold(node)
     end
   end,
 
   ["<space>"] = function(node)
-    local leaf = node.kind == "file" or node.kind == "pkg" or node.kind == "projref"
+    local leaf = node.kind == "file" or node.kind == "pkg" or node.kind == "projref" or node.kind == "docker_file"
     if not leaf then action_toggle_fold(node) end
   end,
 
@@ -615,7 +641,7 @@ local DISPATCH = {
 
   -- Vim-style: h = collapse, l = expand / open file
   ["h"] = function(node)
-    local leaf = node.kind == "file" or node.kind == "pkg" or node.kind == "projref"
+    local leaf = node.kind == "file" or node.kind == "pkg" or node.kind == "projref" or node.kind == "docker_file"
     if not leaf then
       S.collapsed[node.path] = true
       local row = vim.api.nvim_win_get_cursor(S.win)[1]
@@ -625,9 +651,9 @@ local DISPATCH = {
   end,
 
   ["l"] = function(node)
-    local leaf = node.kind == "file" or node.kind == "pkg" or node.kind == "projref"
+    local leaf = node.kind == "file" or node.kind == "pkg" or node.kind == "projref" or node.kind == "docker_file"
     if leaf then
-      if node.kind == "file" then action_open_file(node) end
+      action_open_file(node)
     else
       S.collapsed[node.path] = false
       local row = vim.api.nvim_win_get_cursor(S.win)[1]

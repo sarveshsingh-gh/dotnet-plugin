@@ -16,6 +16,7 @@ function M.setup(user_opts)
   require("dotnet.commands.file")
   require("dotnet.commands.nuget")
   require("dotnet.commands.ef")
+  require("dotnet.commands.docker")
 
   -- Register jobs + files commands in palette
   local cmd = require("dotnet.commands.init")
@@ -49,6 +50,22 @@ function M.setup(user_opts)
     desc     = "Toggle Test Explorer",
     run      = function() require("dotnet.ui.test_explorer").toggle() end,
   })
+
+  -- nvim-cmp NuGet source for .csproj files
+  local ok_cmp, cmp = pcall(require, "cmp")
+  if ok_cmp then
+    cmp.register_source("nuget", require("dotnet.cmp.nuget").new())
+    -- Enable source only in csproj/props/targets buffers
+    vim.api.nvim_create_autocmd({ "BufEnter", "BufNew" }, {
+      pattern = { "*.csproj", "*.fsproj", "*.props", "*.targets" },
+      callback = function()
+        cmp.setup.buffer({ sources = cmp.config.sources(
+          { { name = "nuget", priority = 1100 } },
+          cmp.get_config().sources or {}
+        )})
+      end,
+    })
+  end
 
   -- DAP setup
   require("dotnet.dap.init").setup(_cfg.dap)
