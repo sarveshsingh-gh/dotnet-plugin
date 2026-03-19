@@ -334,88 +334,6 @@ local function do_ls()
   }):find()
 end
 
--- ── Attach debugger ───────────────────────────────────────────────────────────
-
-local function do_attach()
-  if not check_docker() then return end
-  local ok, dap = pcall(require, "dap")
-  if not ok then notify().error("nvim-dap is required for Docker attach"); return end
-
-  local containers = get_containers(false)  -- running only
-  local dotnet_containers = vim.tbl_filter(function(c)
-    return c.status:match("^Up") ~= nil
-  end, containers)
-
-  if #dotnet_containers == 0 then
-    notify().warn("No running containers found")
-    return
-  end
-
-  vim.ui.select(dotnet_containers, {
-    prompt      = "Attach debugger to container:",
-    format_item = function(c) return c.name .. "  (" .. c.image .. ")" end,
-  }, function(container)
-    if not container then return end
-
-    -- Install vsdbg in container if not already present
-    notify().info("Installing vsdbg in " .. container.name .. "…")
-    local install_cmd = {
-      "docker", "exec", container.id, "sh", "-c",
-      "[ -f /vsdbg/vsdbg ] || (apt-get update -qq && apt-get install -yqq curl unzip && " ..
-      "curl -sSL https://aka.ms/getvsdbgsh | bash /dev/stdin -v latest -l /vsdbg)"
-    }
-    vim.fn.jobwait({ vim.fn.jobstart(install_cmd, { stdout_buffered = true }) }, 60000)
-
-    -- Register a temporary docker pipe adapter
-    local adapter_name = "coreclr-docker"
-    dap.adapters[adapter_name] = {
-      type = "pipe",
-      pipe = { "docker", "exec", "-i", container.id, "/vsdbg/vsdbg", "--interpreter=vscode" },
-    }
-
-    -- List dotnet processes in the container
-    local pid_lines = {}
-    vim.fn.jobwait({ vim.fn.jobstart(
-      { "docker", "exec", container.id, "sh", "-c", "ps -eo pid,comm | grep dotnet" },
-      { stdout_buffered = true,
-        on_stdout = function(_, data)
-          for _, l in ipairs(data) do if l ~= "" then table.insert(pid_lines, l) end end
-        end }
-    ) }, 5000)
-
-    local processes = {}
-    for _, l in ipairs(pid_lines) do
-      local pid, name = l:match("^%s*(%d+)%s+(.+)$")
-      if pid then table.insert(processes, { pid = tonumber(pid), name = vim.trim(name) }) end
-    end
-
-    local function start_session(pid)
-      dap.run({
-        type    = adapter_name,
-        request = "attach",
-        processId = pid,
-        justMyCode = false,
-      })
-    end
-
-    if #processes == 0 then
-      vim.ui.input({ prompt = "Process ID to attach: " }, function(pid_str)
-        local pid = tonumber(pid_str)
-        if pid then start_session(pid) end
-      end)
-    elseif #processes == 1 then
-      start_session(processes[1].pid)
-    else
-      vim.ui.select(processes, {
-        prompt      = "Select process:",
-        format_item = function(p) return p.name .. " (pid " .. p.pid .. ")" end,
-      }, function(p)
-        if p then start_session(p.pid) end
-      end)
-    end
-  end)
-end
-
 -- ── Compose helpers ───────────────────────────────────────────────────────────
 
 local function compose_file_or_warn()
@@ -741,78 +659,6 @@ local function do_compose_open()
   end)
 end
 
--- ── Debug Dockerfile scaffold ─────────────────────────────────────────────────
-
-local function write_dockerfile_debug(proj_path, sdk_ver, port, use_aspnet_img)
-  local proj_dir  = vim.fn.fnamemodify(proj_path, ":h")
-  local proj_name = vim.fn.fnamemodify(proj_path, ":t:r")
-  local sln       = require("dotnet.core.solution").find(proj_dir)
-  local sln_dir   = sln and vim.fn.fnamemodify(sln, ":h") or proj_dir
-
-  local rel = proj_path
-  if rel:sub(1, #sln_dir + 1) == sln_dir .. "/" then rel = rel:sub(#sln_dir + 2) end
-
-  local restore_target = rel
-
-  local runtime_img = use_aspnet_img
-    and ("mcr.microsoft.com/dotnet/aspnet:" .. sdk_ver)
-    or  ("mcr.microsoft.com/dotnet/runtime:" .. sdk_ver)
-
-  local lines = {
-    "# Debug image — NOT for production",
-    "FROM mcr.microsoft.com/dotnet/sdk:" .. sdk_ver .. " AS debug",
-    "WORKDIR /src",
-    "COPY . .",
-    'RUN dotnet restore "' .. restore_target .. '"',
-    'RUN dotnet build "' .. rel .. '" -c Debug -o /app/debug --no-restore',
-    "",
-    "FROM " .. runtime_img,
-    "WORKDIR /app",
-  }
-  if port then table.insert(lines, "EXPOSE " .. port) end
-  vim.list_extend(lines, {
-    "# Install vsdbg for DAP attach",
-    "RUN apt-get update && apt-get install -y --no-install-recommends curl unzip \\",
-    "    && curl -sSL https://aka.ms/getvsdbgsh | bash /dev/stdin -v latest -l /vsdbg \\",
-    "    && rm -rf /var/lib/apt/lists/*",
-    "COPY --from=debug /app/debug .",
-    'ENTRYPOINT ["dotnet", "' .. proj_name .. '.dll"]',
-    "",
-  })
-
-  local dockerfile = proj_dir .. "/Dockerfile.debug"
-  vim.fn.writefile(lines, dockerfile)
-  notify().ok("Dockerfile.debug → " .. dockerfile)
-  notify().info("Use this in docker-compose.debug.yml with  dockerfile: .../Dockerfile.debug")
-  vim.cmd("edit " .. vim.fn.fnameescape(dockerfile))
-end
-
-local function do_scaffold_debug()
-  picker.project({}, function(proj)
-    local ptype = project_type(proj)
-    if not is_runnable(ptype) then
-      notify().warn(vim.fn.fnamemodify(proj, ":t:r") .. " is a " .. ptype .. " — not runnable")
-      return
-    end
-    local detected = detect_sdk_version(proj)
-    local sdk_versions = { detected }
-    for _, v in ipairs({ "10.0", "9.0", "8.0", "7.0", "6.0" }) do
-      if v ~= detected then table.insert(sdk_versions, v) end
-    end
-    vim.ui.select(sdk_versions, { prompt = "SDK version (detected: " .. detected .. "):" }, function(sdk_ver)
-      if not sdk_ver then return end
-      local port = default_port(ptype)
-      if port then
-        vim.ui.input({ prompt = "Port: ", default = port }, function(p)
-          if p and p ~= "" then write_dockerfile_debug(proj, sdk_ver, p, uses_aspnet(ptype)) end
-        end)
-      else
-        write_dockerfile_debug(proj, sdk_ver, nil, uses_aspnet(ptype))
-      end
-    end)
-  end)
-end
-
 -- ── Compose ───────────────────────────────────────────────────────────────────
 
 local function do_compose_up()
@@ -885,11 +731,6 @@ reg("docker.ls", {
   desc = "List containers",
   run  = do_ls,
 })
-reg("docker.attach", {
-  icon = "󰃤 ",
-  desc = "Attach debugger to container",
-  run  = do_attach,
-})
 reg("docker.compose_add_db", {
   icon = "󰆼 ",
   desc = "Add database to docker-compose.yml",
@@ -899,11 +740,6 @@ reg("docker.compose_open", {
   icon = "󰖟 ",
   desc = "Open service in browser",
   run  = do_compose_open,
-})
-reg("docker.scaffold_debug", {
-  icon = "󰃤 ",
-  desc = "Scaffold Dockerfile.debug (for DAP attach)",
-  run  = do_scaffold_debug,
 })
 reg("docker.compose_up", {
   icon = "󰐗 ",
@@ -928,9 +764,7 @@ M.compose_scaffold  = do_compose_scaffold
 M.build             = do_build
 M.run               = do_run
 M.ls                = do_ls
-M.attach            = do_attach
 M.compose_open      = do_compose_open
-M.scaffold_debug    = do_scaffold_debug
 M.compose_add_db    = do_compose_add_db
 M.compose_up        = do_compose_up
 M.compose_down      = do_compose_down
