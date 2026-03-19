@@ -62,6 +62,7 @@ function M.setup(km)
   bind(km.launch_settings, function() require("dotnet.commands.init").run("file.launch_settings") end, "Dotnet add launchSettings.json")
   bind(km.run_func,        function() require("dotnet.commands.init").run("run.func") end,        "Azure Function start")
   bind(km.debug_func,      function() require("dotnet.commands.init").run("run.func_debug") end,  "Azure Function debug")
+  bind(km.func_new,        function() require("dotnet.commands.init").run("run.func_new") end,      "Azure Function new")
 
   -- VS-style debug F-keys
   local ok, dap = pcall(require, "dap")

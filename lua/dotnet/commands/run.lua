@@ -2,6 +2,38 @@ local cmd    = require("dotnet.commands.init")
 local runner = require("dotnet.core.runner")
 local picker = require("dotnet.ui.picker")
 
+-- Start azurite if not already running, then call cb() after a brief delay.
+-- Cross-platform: works on Linux, macOS, and Windows.
+local function ensure_azurite(cb)
+  local notify = require("dotnet.notify")
+  if vim.fn.executable("azurite") == 0 then
+    notify.warn("azurite not found — install with: npm install -g azurite")
+    cb(); return
+  end
+
+  local is_win = vim.fn.has("win32") == 1
+  local check  = is_win
+    and { "powershell", "-Command", "Get-Process azurite -ErrorAction SilentlyIgnore" }
+    or  { "pgrep", "-x", "azurite" }
+
+  local running = false
+  vim.fn.jobwait({ vim.fn.jobstart(check, {
+    stdout_buffered = true,
+    on_stdout = function(_, data)
+      for _, l in ipairs(data) do if l ~= "" then running = true end end
+    end,
+  }) }, 2000)
+
+  if running then cb(); return end
+
+  local dir = vim.fn.expand("~/.azurite")
+  vim.fn.mkdir(dir, "p")
+  vim.fn.jobstart({ "azurite", "--location", dir, "--silent" }, { detach = true })
+  notify.info("Azurite started")
+  -- Give azurite ~1s to bind its ports before func connects
+  vim.defer_fn(cb, 1000)
+end
+
 -- Walk up from dir until host.json is found (Azure Functions project root)
 local function find_func_root(dir)
   local d = vim.fn.fnamemodify(dir, ":p"):gsub("/$", "")
@@ -62,12 +94,18 @@ reg("run.func", {
       require("dotnet.notify").warn("Azure Functions Core Tools ('func') not found in PATH")
       return
     end
-    picker.runnable({ prompt = "Start Azure Function:" }, function(proj)
+    local function is_func(p)
+      local dir = vim.fn.fnamemodify(p, ":h")
+      return vim.fn.filereadable(dir .. "/host.json") == 1
+    end
+    picker.project({ prompt = "Start Azure Function:", filter = is_func }, function(proj)
       local func_root = find_func_root(vim.fn.fnamemodify(proj, ":h"))
-      runner.term({ "func", "start" }, {
-        cwd   = func_root,
-        label = "func start — " .. vim.fn.fnamemodify(proj, ":t:r"),
-      })
+      ensure_azurite(function()
+        runner.term({ "func", "start" }, {
+          cwd   = func_root,
+          label = "func start — " .. vim.fn.fnamemodify(proj, ":t:r"),
+        })
+      end)
     end)
   end,
 })
@@ -80,78 +118,143 @@ reg("run.func_debug", {
       require("dotnet.notify").warn("Azure Functions Core Tools ('func') not found in PATH")
       return
     end
-    picker.runnable({ prompt = "Debug Azure Function:" }, function(proj)
+    local function is_func(p)
+      return vim.fn.filereadable(vim.fn.fnamemodify(p, ":h") .. "/host.json") == 1
+    end
+    picker.project({ prompt = "Debug Azure Function:", filter = is_func }, function(proj)
       local func_root = find_func_root(vim.fn.fnamemodify(proj, ":h"))
       local name      = vim.fn.fnamemodify(proj, ":t:r")
       local notify   = require("dotnet.notify")
       local ok, dap  = pcall(require, "dap")
       if not ok then notify.warn("nvim-dap not available"); return end
 
-      -- Start func in a visible terminal so the user can see output
-      runner.term({ "func", "start" }, {
-        cwd   = func_root,
-        label = "func start — " .. name,
-      })
-
-      notify.info("func host starting — will auto-attach when ready…")
-
-      -- Poll for the dotnet worker process spawned by func (up to 40s)
-      local attempts   = 0
-      local max        = 40
-      local attached   = false
-      local func_pid   = nil
-
-      -- Try to find the func process pid by name + cwd match
-      local function find_dotnet_pid()
-        local lines = {}
-        vim.fn.jobwait({ vim.fn.jobstart(
-          { "sh", "-c", "ps -eo pid,ppid,cmd | grep -v grep | grep dotnet" },
-          { stdout_buffered = true,
-            on_stdout = function(_, data)
-              for _, l in ipairs(data) do if l ~= "" then table.insert(lines, l) end end
-            end }
-        ) }, 2000)
-        for _, l in ipairs(lines) do
-          -- look for dotnet process running something from proj_dir
-          if l:find(func_root:gsub("([%(%)%.%%%+%-%*%?%[%^%$])", "%%%1"), 1, true) or
-             l:find("func", 1, true) then
-            local pid = l:match("^%s*(%d+)")
-            if pid then return tonumber(pid) end
-          end
-        end
-        -- fallback: any dotnet host process
-        for _, l in ipairs(lines) do
-          local pid = l:match("^%s*(%d+)")
-          if pid then return tonumber(pid) end
-        end
-      end
-
-      local function try_attach()
-        if attached then return end
-        attempts = attempts + 1
-        if attempts > max then
-          notify.warn("func host did not start in time — use Debug › Attach manually")
-          return
-        end
-
-        local pid = find_dotnet_pid()
-        if not pid then
-          vim.defer_fn(try_attach, 1000)
-          return
-        end
-
-        attached = true
-        notify.info("func host ready (pid " .. pid .. ") — attaching debugger")
-        dap.run({
-          type      = "coreclr",
-          name      = "Debug Azure Function: " .. name,
-          request   = "attach",
-          processId = pid,
+      ensure_azurite(function()
+        -- Start func in a visible terminal so the user can see output
+        runner.term({ "func", "start" }, {
+          cwd   = func_root,
+          label = "func start — " .. name,
         })
-      end
 
-      -- Give func a couple seconds to start spawning dotnet before first poll
-      vim.defer_fn(try_attach, 3000)
+        notify.info("func host starting — auto-attach will begin in 5s…")
+
+        -- Retry-based worker process detection.
+        -- dotnet-isolated worker cmd contains both the DLL name and "--host LocalFunctionsHost".
+        -- We retry every 2s for up to ~21s to handle slow startup.
+        local dll         = name .. ".dll"
+        local max_attempts = 8
+        local attached    = false
+
+        local function try_attach(attempt)
+          if attached then return end
+          if attempt > max_attempts then
+            notify.warn("Worker process not found — is func running? Use M-p → Debug attach to attach manually.")
+            return
+          end
+
+          local procs = {}
+          local grep  = "ps -eo pid,cmd | grep -v grep | grep -E 'LocalFunctionsHost|" .. dll .. "'"
+          vim.fn.jobwait({ vim.fn.jobstart({ "sh", "-c", grep }, {
+            stdout_buffered = true,
+            on_stdout = function(_, data)
+              for _, l in ipairs(data) do
+                local pid, pcmd = l:match("^%s*(%d+)%s+(.+)$")
+                if pid then table.insert(procs, { pid = tonumber(pid), cmd = vim.trim(pcmd) }) end
+              end
+            end,
+          }) }, 2000)
+
+          if #procs == 0 then
+            if attempt < max_attempts then
+              notify.info(string.format("Waiting for worker… (%d/%d)", attempt, max_attempts))
+              vim.defer_fn(function() try_attach(attempt + 1) end, 2000)
+            else
+              notify.warn("Worker process not found — use M-p → Debug attach to attach manually.")
+            end
+            return
+          end
+
+          -- Prefer the process whose cmd contains the DLL (the actual user code process)
+          local target = nil
+          for _, p in ipairs(procs) do
+            if p.cmd:find(dll, 1, true) then target = p; break end
+          end
+          target = target or procs[1]
+
+          attached = true
+          notify.info("Attaching debugger to " .. name .. " (pid " .. target.pid .. ")…")
+          dap.run({
+            type      = "coreclr",
+            name      = "Debug Azure Function: " .. name,
+            request   = "attach",
+            processId = target.pid,
+            justMyCode = false,
+          })
+        end
+
+        vim.defer_fn(function() try_attach(1) end, 5000)
+      end) -- ensure_azurite
+    end)
+  end,
+})
+
+local FUNC_TEMPLATES = {
+  { label = "HTTP trigger",              template = "HTTP trigger" },
+  { label = "Timer trigger",             template = "Timer trigger" },
+  { label = "Queue trigger",             template = "Queue trigger" },
+  { label = "Blob trigger",              template = "Blob trigger" },
+  { label = "Service Bus Queue trigger", template = "Service Bus Queue trigger" },
+  { label = "Service Bus Topic trigger", template = "Service Bus Topic trigger" },
+  { label = "Event Hub trigger",         template = "Event Hub trigger" },
+  { label = "Event Grid trigger",        template = "Event Grid trigger" },
+  { label = "Cosmos DB trigger",         template = "Cosmos DB trigger" },
+  { label = "Durable — Orchestrator",    template = "Durable Functions Orchestrator" },
+  { label = "Durable — Activity",        template = "Durable Functions Activity" },
+  { label = "Durable — HTTP start",      template = "Durable Functions HttpStart" },
+}
+
+reg("run.func_new", {
+  icon = "󰡱 ",
+  desc = "New Azure Function (func new)",
+  run  = function()
+    if vim.fn.executable("func") == 0 then
+      require("dotnet.notify").warn("Azure Functions Core Tools ('func') not found in PATH")
+      return
+    end
+
+    local function is_func(p)
+      return vim.fn.filereadable(vim.fn.fnamemodify(p, ":h") .. "/host.json") == 1
+    end
+
+    picker.project({ prompt = "New function in project:", filter = is_func }, function(proj)
+      local func_root = find_func_root(vim.fn.fnamemodify(proj, ":h"))
+
+      vim.ui.select(FUNC_TEMPLATES, {
+        prompt      = "Trigger type:",
+        format_item = function(t) return t.label end,
+      }, function(tpl)
+        if not tpl then return end
+
+        vim.ui.input({ prompt = "Function name: " }, function(name)
+          if not name or name == "" then return end
+
+          runner.bg(
+            { "func", "new", "--template", tpl.template, "--name", name },
+            {
+              cwd            = func_root,
+              label          = "func new " .. name,
+              notify_success = true,
+              on_exit        = function(code)
+                if code == 0 then
+                  local file = func_root .. "/" .. name .. ".cs"
+                  if vim.fn.filereadable(file) == 1 then
+                    vim.schedule(function() vim.cmd("edit " .. vim.fn.fnameescape(file)) end)
+                  end
+                end
+              end,
+            }
+          )
+        end)
+      end)
     end)
   end,
 })

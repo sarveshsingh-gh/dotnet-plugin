@@ -112,25 +112,41 @@ end
 
 -- ── Terminal job ──────────────────────────────────────────────────────────────
 
---- Run a dotnet command in a terminal buffer (run / watch).
--- opts: { cwd, label, direction, size, on_exit }
+--- Run a dotnet command in a terminal split (bottom, NvChad-compatible).
+-- opts: { cwd, label, on_exit }
 function M.term(args, opts)
   opts = opts or {}
-  local label     = opts.label or table.concat(args, " ")
-  local direction = opts.direction or "botright"
-  local size      = opts.size or 15
+  local label = opts.label or table.concat(args, " ")
 
-  -- Reuse existing window or open new split
-  local saved = vim.api.nvim_get_current_win()
-  vim.cmd(direction .. " " .. size .. "split")
+  -- Build command string (cd to cwd first so termopen cwd option isn't needed)
+  local cmd_str = table.concat(vim.tbl_map(vim.fn.shellescape, args), " ")
+  if opts.cwd then
+    cmd_str = "cd " .. vim.fn.shellescape(opts.cwd) .. " && " .. cmd_str
+  end
+
+  -- Use NvChad's terminal — handles buflisted, winopts, splits correctly
+  local ok, nvterm = pcall(require, "nvchad.term")
+  if ok then
+    nvterm.new({ cmd = cmd_str, pos = "bo sp", size = 0.35 })
+    local buf = vim.api.nvim_get_current_buf()
+    local job_id = vim.b[buf].terminal_job_id or -1
+    if job_id > 0 then
+      local okp, pid = pcall(vim.fn.jobpid, job_id)
+      _jobs[job_id] = { label = label, buf = buf, pid = okp and pid or nil, cmd = args }
+      vim.keymap.set("n", "x", function() M.stop(job_id) end, { buffer = buf, silent = true })
+    end
+    return job_id, buf
+  end
+
+  -- Fallback: raw split + termopen
+  local buf = vim.api.nvim_create_buf(false, true)
+  vim.cmd("bo sp")
   local win = vim.api.nvim_get_current_win()
-
-  local buf  = vim.api.nvim_create_buf(false, true)
   vim.api.nvim_win_set_buf(win, buf)
-  vim.api.nvim_set_current_win(saved)
+  vim.bo[buf].buflisted = false
+  vim.api.nvim_win_set_height(win, math.floor(vim.o.lines * 0.35))
 
-  local job_id = vim.fn.termopen(args, {
-    cwd    = opts.cwd,
+  local job_id = vim.fn.termopen({ vim.o.shell, "-c", cmd_str }, {
     on_exit = function(id, code)
       vim.schedule(function()
         untrack(id)
@@ -140,9 +156,8 @@ function M.term(args, opts)
   })
 
   if job_id > 0 then
-    local ok, pid = pcall(vim.fn.jobpid, job_id)
-    _jobs[job_id] = { label = label, buf = buf, pid = ok and pid or nil, cmd = args }
-    -- bind x in the term buffer to stop
+    local okp, pid = pcall(vim.fn.jobpid, job_id)
+    _jobs[job_id] = { label = label, buf = buf, pid = okp and pid or nil, cmd = args }
     vim.keymap.set("n", "x", function() M.stop(job_id) end, { buffer = buf, silent = true })
   end
 

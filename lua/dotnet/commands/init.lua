@@ -86,6 +86,7 @@ function M.annotate_keys(km)
     ["run.profile"]          = km.run_profile,
     ["run.func"]             = km.run_func,
     ["run.func_debug"]       = km.debug_func,
+    ["run.func_new"]         = km.func_new,
     -- file (extra)
     ["file.launch_settings"] = km.launch_settings,
     -- misc

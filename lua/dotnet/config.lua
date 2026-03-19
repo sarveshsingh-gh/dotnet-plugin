@@ -78,6 +78,7 @@ M.defaults = {
     launch_settings  = "<leader>nL",
     run_func         = "<leader>naf",
     debug_func       = "<leader>naF",
+    func_new         = "<leader>naN",
     -- solution
     remove_project      = "<leader>nsr",
     -- Docker
