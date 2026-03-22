@@ -496,20 +496,32 @@ local function action_rename_project(node)
       vim.fn.rename(old_csproj_in_new, new_proj)
     end
 
-    -- 3. Update .sln — replace old project name + path
+    -- 3. Update .sln / .slnx — replace old project name + path
     if sln and vim.fn.filereadable(sln) == 1 then
       local ok, lines = pcall(vim.fn.readfile, sln)
       if ok then
         local sln_dir = vim.fn.fnamemodify(sln, ":h")
-        local old_rel = vim.fn.fnamemodify(old_proj, ":." ):gsub("^" .. vim.pesc(sln_dir .. "/"), "")
-        local new_rel = vim.fn.fnamemodify(new_proj,  ":." ):gsub("^" .. vim.pesc(sln_dir .. "/"), "")
-        -- Normalize to backslashes for .sln format
-        old_rel = old_rel:gsub("/", "\\")
-        new_rel = new_rel:gsub("/", "\\")
+        local is_slnx = sln:match("%.slnx$")
+
+        -- Compute relative paths from solution directory
+        local old_rel = old_proj:gsub("^" .. vim.pesc(sln_dir .. "/"), "")
+        local new_rel = new_proj:gsub("^" .. vim.pesc(sln_dir .. "/"), "")
+
         local new_lines = {}
         for _, l in ipairs(lines) do
-          l = l:gsub(vim.pesc(old_cname), new_name)
-          l = l:gsub(vim.pesc(old_rel),   new_rel)
+          if is_slnx then
+            -- .slnx: <Project Path="src/OldName/OldName.csproj" ... />
+            -- Replace Path value (forward slashes)
+            l = l:gsub(vim.pesc(old_rel), new_rel)
+            -- Also handle backslash variants
+            l = l:gsub(vim.pesc(old_rel:gsub("/", "\\")), new_rel:gsub("/", "\\"))
+          else
+            -- .sln: = "OldName", "src\OldName\OldName.csproj", "{GUID}"
+            local old_rel_bs = old_rel:gsub("/", "\\")
+            local new_rel_bs = new_rel:gsub("/", "\\")
+            l = l:gsub('"' .. vim.pesc(old_cname) .. '"', '"' .. new_name .. '"')
+            l = l:gsub(vim.pesc(old_rel_bs), new_rel_bs)
+          end
           table.insert(new_lines, l)
         end
         vim.fn.writefile(new_lines, sln)
