@@ -471,6 +471,78 @@ local function action_rename(node)
   end)
 end
 
+local function action_rename_project(node)
+  local old_proj  = node.path                                      -- /a/b/Foo/Foo.csproj
+  local old_dir   = vim.fn.fnamemodify(old_proj, ":h")             -- /a/b/Foo
+  local old_cname = vim.fn.fnamemodify(old_proj, ":t:r")           -- Foo
+  local sln       = S.sln_path
+
+  vim.ui.input({ prompt = "Rename project to: ", default = old_cname }, function(new_name)
+    if not new_name or new_name == "" or new_name == old_cname then return end
+
+    local new_dir   = vim.fn.fnamemodify(old_dir, ":h") .. "/" .. new_name
+    local new_csproj_name = new_name .. ".csproj"
+    local new_proj  = new_dir .. "/" .. new_csproj_name
+
+    -- 1. Rename the project folder
+    if vim.fn.rename(old_dir, new_dir) ~= 0 then
+      require("dotnet.notify").error("Failed to rename folder")
+      return
+    end
+
+    -- 2. Rename the .csproj file inside the new folder
+    local old_csproj_in_new = new_dir .. "/" .. old_cname .. ".csproj"
+    if vim.fn.filereadable(old_csproj_in_new) == 1 then
+      vim.fn.rename(old_csproj_in_new, new_proj)
+    end
+
+    -- 3. Update .sln — replace old project name + path
+    if sln and vim.fn.filereadable(sln) == 1 then
+      local ok, lines = pcall(vim.fn.readfile, sln)
+      if ok then
+        local sln_dir = vim.fn.fnamemodify(sln, ":h")
+        local old_rel = vim.fn.fnamemodify(old_proj, ":." ):gsub("^" .. vim.pesc(sln_dir .. "/"), "")
+        local new_rel = vim.fn.fnamemodify(new_proj,  ":." ):gsub("^" .. vim.pesc(sln_dir .. "/"), "")
+        -- Normalize to backslashes for .sln format
+        old_rel = old_rel:gsub("/", "\\")
+        new_rel = new_rel:gsub("/", "\\")
+        local new_lines = {}
+        for _, l in ipairs(lines) do
+          l = l:gsub(vim.pesc(old_cname), new_name)
+          l = l:gsub(vim.pesc(old_rel),   new_rel)
+          table.insert(new_lines, l)
+        end
+        vim.fn.writefile(new_lines, sln)
+      end
+    end
+
+    -- 4. Update ProjectReference in all sibling csproj files
+    if sln then
+      for _, proj in ipairs(solution.projects(sln)) do
+        if proj ~= old_proj and vim.fn.filereadable(proj) == 1 then
+          local ok2, lines = pcall(vim.fn.readfile, proj)
+          if ok2 then
+            local changed = false
+            local new_lines = {}
+            for _, l in ipairs(lines) do
+              local new_l = l:gsub(vim.pesc(old_cname .. "\\" .. old_cname .. ".csproj"),
+                                   new_name .. "\\" .. new_csproj_name)
+                             :gsub(vim.pesc(old_cname .. "/" .. old_cname .. ".csproj"),
+                                   new_name .. "/" .. new_csproj_name)
+              if new_l ~= l then changed = true end
+              table.insert(new_lines, new_l)
+            end
+            if changed then vim.fn.writefile(new_lines, proj) end
+          end
+        end
+      end
+    end
+
+    require("dotnet.notify").ok("Renamed project: " .. old_cname .. " → " .. new_name)
+    refresh()
+  end)
+end
+
 local function action_remove_package(node)
   local proj_dir = vim.fn.fnamemodify(node._proj_path, ":h")
   confirm("Remove package '" .. node._pkg_name .. "'?", function()
@@ -613,7 +685,11 @@ local DISPATCH = {
   end,
 
   ["r"] = function(node)
-    if node.kind == "file" or node.kind == "dir" then action_rename(node) end
+    if node.kind == "project" then
+      action_rename_project(node)
+    elseif node.kind == "file" or node.kind == "dir" then
+      action_rename(node)
+    end
   end,
 
   ["b"] = function(node, row)
