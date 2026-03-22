@@ -29,7 +29,8 @@ return {
   {
     "mason-org/mason.nvim",
     opts = function(_, opts)
-      opts.registries = opts.registries or {}
+      -- preserve the default registry if none have been set yet
+      opts.registries = opts.registries or { "github:mason-org/mason-registry" }
       local has = false
       for _, r in ipairs(opts.registries) do
         if r:find("Crashdummyy") then has = true; break end
