@@ -450,6 +450,70 @@ cmd.register("nuget.outdated", {
   end,
 })
 
+cmd.register("nuget.vulnerable", {
+  category = "nuget",
+  icon     = "󰒃 ",
+  desc     = "Scan for vulnerable packages",
+  run      = function()
+    picker.project({}, function(proj)
+      local cwd = vim.fn.fnamemodify(proj, ":h")
+      require("dotnet.notify").info("Scanning for vulnerabilities…")
+      runner.bg({ "dotnet", "list", proj, "package", "--vulnerable", "--include-transitive" }, {
+        cwd            = cwd,
+        label          = "NuGet vulnerability scan",
+        notify_success = false,
+        on_exit = function(code, stdout, stderr)
+          local lines = vim.list_extend(vim.deepcopy(stdout or {}), stderr or {})
+
+          -- Check for "no vulnerable packages" message
+          for _, l in ipairs(lines) do
+            if l:lower():find("no vulnerable") or l:lower():find("0 vulnerable") then
+              require("dotnet.notify").ok("No vulnerable packages found")
+              return
+            end
+          end
+
+          -- Collect vulnerable package lines (lines starting with >)
+          local vuln_lines = {}
+          local in_vuln = false
+          for _, l in ipairs(lines) do
+            if l:lower():find("vulnerable") then in_vuln = true end
+            if in_vuln and l:match("^%s*>") then
+              table.insert(vuln_lines, l)
+            end
+          end
+
+          if #vuln_lines == 0 then
+            require("dotnet.notify").ok("No vulnerable packages found")
+            return
+          end
+
+          vim.schedule(function()
+            local display = {
+              "Vulnerable packages — " .. vim.fn.fnamemodify(proj, ":t:r"),
+              string.rep("─", 60),
+            }
+            vim.list_extend(display, vuln_lines)
+            local buf    = vim.api.nvim_create_buf(false, true)
+            vim.api.nvim_buf_set_lines(buf, 0, -1, false, display)
+            local width  = math.max(60, math.min(100, vim.o.columns - 10))
+            local height = math.min(#display + 2, 25)
+            vim.api.nvim_open_win(buf, true, {
+              relative = "editor", width = width, height = height,
+              row = math.floor((vim.o.lines - height) / 2),
+              col = math.floor((vim.o.columns - width) / 2),
+              style = "minimal", border = "rounded",
+              title = " ⚠  Vulnerable Packages ", title_pos = "center",
+            })
+            vim.keymap.set("n", "q",     "<cmd>close<cr>", { buffer = buf, silent = true })
+            vim.keymap.set("n", "<esc>", "<cmd>close<cr>", { buffer = buf, silent = true })
+          end)
+        end,
+      })
+    end)
+  end,
+})
+
 local M = {}
 M.add_package     = do_add_package
 M.remove_package  = do_remove_package

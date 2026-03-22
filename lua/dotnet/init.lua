@@ -19,6 +19,9 @@ function M.setup(user_opts)
   require("dotnet.commands.docker")
   require("dotnet.commands.migrate")
   require("dotnet.commands.aspire")
+  require("dotnet.commands.secrets")
+  require("dotnet.commands.devcerts")
+  require("dotnet.commands.http")
 
   -- Register jobs + files commands in palette
   local cmd = require("dotnet.commands.init")

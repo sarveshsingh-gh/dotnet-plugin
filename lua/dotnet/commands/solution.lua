@@ -30,6 +30,49 @@ reg("solution.remove_project", {
   end,
 })
 
+reg("solution.add_ref", {
+  icon = "󰐒 ",
+  desc = "Add project reference",
+  run  = function()
+    picker.project({ prompt = "Add reference to:" }, function(proj)
+      picker.project({ prompt = "Reference project:" }, function(ref)
+        if ref == proj then
+          require("dotnet.notify").warn("Cannot reference itself")
+          return
+        end
+        require("dotnet.core.project").add_ref(proj, ref, function()
+          pcall(function() require("dotnet.ui.explorer").refresh_if_open() end)
+        end)
+      end)
+    end)
+  end,
+})
+
+reg("solution.remove_ref", {
+  icon = "󰐘 ",
+  desc = "Remove project reference",
+  run  = function()
+    picker.project({ prompt = "Remove reference from:" }, function(proj)
+      local deps = require("dotnet.core.project").deps(proj)
+      local refs = deps.refs or {}
+      if #refs == 0 then
+        require("dotnet.notify").info("No project references in " .. vim.fn.fnamemodify(proj, ":t:r"))
+        return
+      end
+      vim.ui.select(refs, {
+        prompt      = "Remove reference:",
+        format_item = function(r) return r.name end,
+      }, function(choice)
+        if not choice then return end
+        local proj_dir = vim.fn.fnamemodify(proj, ":h")
+        require("dotnet.core.project").remove(proj_dir, "reference", choice.path, function()
+          pcall(function() require("dotnet.ui.explorer").refresh_if_open() end)
+        end)
+      end)
+    end)
+  end,
+})
+
 reg("solution.new_project", {
   icon = "󰏗 ",
   desc = "New project",
