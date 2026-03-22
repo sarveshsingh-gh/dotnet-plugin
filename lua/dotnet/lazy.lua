@@ -47,12 +47,21 @@ return {
     end,
   },
 
-  -- ── Roslyn: C# LSP + inlay hints ─────────────────────────────────────────
+  -- ── Enable code lens globally (LazyVim disables it by default) ───────────
+  {
+    "nvim-lspconfig",
+    opts = {
+      codelens = { enabled = true },
+    },
+  },
+
+  -- ── Roslyn: C# LSP + inlay hints + code lens ─────────────────────────────
   {
     "seblyng/roslyn.nvim",
     ft     = "cs",
     config = function()
-      local inlay_hint_settings = {
+      local roslyn_settings = {
+        -- inlay hints: var types, parameter names
         ["csharp|inlay_hints"] = {
           csharp_enable_inlay_hints_for_implicit_variable_types = true,
           csharp_enable_inlay_hints_for_lambda_parameter_types  = true,
@@ -61,15 +70,19 @@ return {
           dotnet_enable_inlay_hints_for_literal_parameters      = true,
           dotnet_enable_inlay_hints_for_other_parameters        = true,
         },
+        -- code lens: "N references" / "N implementations" above methods
+        ["csharp|code_lens"] = {
+          dotnet_enable_references_code_lens     = true,
+          dotnet_enable_tests_code_lens          = true,
+        },
       }
 
-      -- Register settings so workspace/configuration responses include them
-      vim.lsp.config("roslyn", { settings = inlay_hint_settings })
+      vim.lsp.config("roslyn", { settings = roslyn_settings })
 
       require("roslyn").setup()
 
-      -- Roslyn returns warnings for inlay hint requests made before the project is
-      -- loaded. Once initialization completes, force-refresh hints for all cs buffers.
+      -- Roslyn rejects inlay/codelens requests until the project is fully loaded.
+      -- Re-request both once initialization completes.
       vim.api.nvim_create_autocmd("User", {
         pattern  = "RoslynInitialized",
         callback = function()
@@ -79,8 +92,11 @@ return {
                 and vim.bo[bufnr].filetype == "cs"
                 and #vim.lsp.get_clients({ name = "roslyn", bufnr = bufnr }) > 0
               then
+                -- refresh inlay hints
                 vim.lsp.inlay_hint.enable(false, { bufnr = bufnr })
                 vim.lsp.inlay_hint.enable(true,  { bufnr = bufnr })
+                -- refresh code lens
+                vim.lsp.codelens.refresh()
               end
             end
           end, 500)
