@@ -122,6 +122,60 @@ reg("migrate.cpm", {
   end,
 })
 
+-- ── centralisedpackageconverter (community tool) ─────────────────────────────
+
+local CPM_TOOL = "centralisedpackageconverter"
+
+local function cpm_tool_installed()
+  local handle = io.popen("dotnet tool list -g 2>/dev/null")
+  if not handle then return false end
+  local out = handle:read("*a"); handle:close()
+  return out:lower():find(CPM_TOOL:lower()) ~= nil
+end
+
+reg("migrate.cpm_tool_install", {
+  icon = "󰏔 ",
+  desc = "Install centralisedpackageconverter (global tool)",
+  run  = function()
+    if cpm_tool_installed() then
+      notify.info(CPM_TOOL .. " already installed")
+      return
+    end
+    require("dotnet.core.runner").bg(
+      { "dotnet", "tool", "install", "-g", CPM_TOOL },
+      { label = "Installing " .. CPM_TOOL, notify_success = true }
+    )
+  end,
+})
+
+reg("migrate.cpm_tool_run", {
+  icon = "󰏗 ",
+  desc = "Run centralisedpackageconverter on solution",
+  run  = function()
+    if not cpm_tool_installed() then
+      notify.warn(CPM_TOOL .. " not installed — run 'Install centralisedpackageconverter' first")
+      return
+    end
+    picker.solution(function(sln)
+      local sln_dir = vim.fn.fnamemodify(sln, ":h")
+      require("dotnet.core.runner").bg(
+        { "dotnet", CPM_TOOL, "--solution", sln },
+        {
+          cwd   = sln_dir,
+          label = "CPM convert: " .. vim.fn.fnamemodify(sln, ":t"),
+          notify_success = true,
+          on_exit = function(code)
+            if code == 0 then
+              -- Refresh solution explorer so Solution Items picks up new props file
+              pcall(function() require("dotnet.ui.explorer").refresh_if_open() end)
+            end
+          end,
+        }
+      )
+    end)
+  end,
+})
+
 -- ── Global Usings ──────────────────────────────────────────────────────────────
 
 local COMMON_USINGS = {
