@@ -125,6 +125,54 @@ local function build_nodes()
   local sln   = S.sln_path
   if not sln then return nodes end
 
+  -- ── Solution Items folder (always first) ─────────────────────────────────
+  local sln_dir = vim.fn.fnamemodify(sln, ":h")
+  local sol_item_names = {
+    "Directory.Packages.props",
+    "Directory.Build.props",
+    "Directory.Build.targets",
+    "global.json",
+    ".editorconfig",
+    "nuget.config",
+    "NuGet.Config",
+    "docker-compose.yml",
+    "docker-compose.yaml",
+    "docker-compose.debug.yml",
+    "docker-compose.override.yml",
+    "compose.yml",
+    "compose.yaml",
+  }
+  local sol_items = {}
+  for _, name in ipairs(sol_item_names) do
+    local p = sln_dir .. "/" .. name
+    if vim.fn.filereadable(p) == 1 then
+      table.insert(sol_items, { path = p, label = name })
+    end
+  end
+  if #sol_items > 0 then
+    local si_key = sln .. "::solution_items"
+    if S.collapsed[si_key] == nil then S.collapsed[si_key] = true end
+    local si_coll = S.collapsed[si_key]
+    local fic, fhl = folder_icon(si_coll)
+    table.insert(nodes, {
+      text      = fic .. "Solution Items",
+      indent    = 1, kind = "dir", path = si_key,
+      collapsed = si_coll,
+      _ibytes   = #fic, _ihl = fhl,
+    })
+    if not si_coll then
+      for _, item in ipairs(sol_items) do
+        local ic, ihl = icon_for_file(item.label)
+        table.insert(nodes, {
+          text      = ic .. item.label,
+          indent    = 2, kind = "file", path = item.path,
+          collapsed = false,
+          _ibytes   = #ic, _ihl = ihl,
+        })
+      end
+    end
+  end
+
   local proj_list = solution.projects(sln)
 
   for _, proj_path in ipairs(proj_list) do
@@ -203,57 +251,6 @@ local function build_nodes()
             _ibytes   = #fic, _ihl = fhl,
           })
         end
-      end
-    end
-  end
-
-  -- ── Solution Items folder ────────────────────────────────────────────────
-  -- Collects solution-level files: central package management, build props,
-  -- editor config, global.json, nuget config, docker compose, etc.
-  local sln_dir = vim.fn.fnamemodify(sln, ":h")
-  local sol_item_names = {
-    "Directory.Packages.props",
-    "Directory.Build.props",
-    "Directory.Build.targets",
-    "global.json",
-    ".editorconfig",
-    "nuget.config",
-    "NuGet.Config",
-    "docker-compose.yml",
-    "docker-compose.yaml",
-    "docker-compose.debug.yml",
-    "docker-compose.override.yml",
-    "compose.yml",
-    "compose.yaml",
-  }
-  local sol_items = {}
-  for _, name in ipairs(sol_item_names) do
-    local p = sln_dir .. "/" .. name
-    if vim.fn.filereadable(p) == 1 then
-      table.insert(sol_items, { path = p, label = name })
-    end
-  end
-
-  if #sol_items > 0 then
-    local si_key = sln .. "::solution_items"
-    if S.collapsed[si_key] == nil then S.collapsed[si_key] = true end
-    local si_coll = S.collapsed[si_key]
-    local fic, fhl = folder_icon(si_coll)
-    table.insert(nodes, {
-      text      = fic .. "Solution Items",
-      indent    = 1, kind = "dir", path = si_key,
-      collapsed = si_coll,
-      _ibytes   = #fic, _ihl = fhl,
-    })
-    if not si_coll then
-      for _, item in ipairs(sol_items) do
-        local ic, ihl = icon_for_file(item.label)
-        table.insert(nodes, {
-          text      = ic .. item.label,
-          indent    = 2, kind = "file", path = item.path,
-          collapsed = false,
-          _ibytes   = #ic, _ihl = ihl,
-        })
       end
     end
   end
