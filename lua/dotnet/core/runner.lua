@@ -124,6 +124,18 @@ function M.term(args, opts)
     cmd_str = "cd " .. vim.fn.shellescape(opts.cwd) .. " && " .. cmd_str
   end
 
+  -- Auto-enter insert mode when focusing any dotnet terminal buffer so that
+  -- Ctrl-C, Ctrl-R etc. are passed directly to the running process.
+  local function setup_term_buf(buf)
+    -- Enter insert mode immediately
+    vim.cmd("startinsert")
+    -- Re-enter insert mode whenever this buffer is focused
+    vim.api.nvim_create_autocmd("BufEnter", {
+      buffer   = buf,
+      callback = function() vim.cmd("startinsert") end,
+    })
+  end
+
   -- Use NvChad's terminal — handles buflisted, winopts, splits correctly
   local ok, nvterm = pcall(require, "nvchad.term")
   if ok then
@@ -135,6 +147,7 @@ function M.term(args, opts)
       _jobs[job_id] = { label = label, buf = buf, pid = okp and pid or nil, cmd = args }
       vim.keymap.set("n", "x", function() M.stop(job_id) end, { buffer = buf, silent = true })
     end
+    setup_term_buf(buf)
     return job_id, buf
   end
 
@@ -161,6 +174,7 @@ function M.term(args, opts)
     vim.keymap.set("n", "x", function() M.stop(job_id) end, { buffer = buf, silent = true })
   end
 
+  setup_term_buf(buf)
   return job_id, buf
 end
 
