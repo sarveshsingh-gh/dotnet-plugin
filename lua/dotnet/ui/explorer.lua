@@ -81,8 +81,8 @@ local function proj_icon_for(proj_path)
   -- so use distinct nerd-font codepoints per project kind.
   if kind == "web"      then return g(0xF0AC) .. " " end  -- globe   (API / Web)
   if kind == "console"  then return g(0xF489) .. " " end  -- term    (Console)
-  if kind == "test"     then return g(0xF0EF) .. " " end  -- flask   (Test)
-  if kind == "function" then return g(0xF0E7) .. " " end  -- bolt    (Azure Function)
+  if kind == "test"     then return g(0xF091) .. " " end  -- trophy  (Test)
+  if kind == "function" then return g(0xF013) .. " " end  -- cog     (Azure Function)
   return g(0xF487) .. " "                                  -- package (Class Library)
 end
 
@@ -683,6 +683,24 @@ local DISPATCH = {
       refresh()
       pcall(vim.api.nvim_win_set_cursor, S.win, { row, 0 })
     end
+  end,
+
+  ["ze"] = function()
+    for _, n in ipairs(S.nodes) do
+      if n.kind ~= "file" and n.kind ~= "pkg" and n.kind ~= "projref" and n.kind ~= "docker_file" then
+        S.collapsed[n.path] = false
+      end
+    end
+    refresh()
+  end,
+
+  ["zc"] = function()
+    for _, n in ipairs(S.nodes) do
+      if n.kind ~= "file" and n.kind ~= "pkg" and n.kind ~= "projref" and n.kind ~= "docker_file" then
+        S.collapsed[n.path] = true
+      end
+    end
+    refresh()
   end,
 
   ["H"] = function()
