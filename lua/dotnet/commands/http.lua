@@ -16,14 +16,14 @@ local function reg(id, def) cmd.register(id, vim.tbl_extend("force", { category 
 local function parse_vars(lines)
   local vars = {}
   for _, l in ipairs(lines) do
-    local k, v = l:match("^@(%w[%w_]*)%s*=%s*(.+)$")
+    local k, v = l:match("^@([%w_.]+)%s*=%s*(.+)$")
     if k then vars[k] = vim.trim(v) end
   end
   return vars
 end
 
 local function subst(text, vars)
-  return (text:gsub("{{([%w_]+)}}", function(k)
+  return (text:gsub("{{([%w_.]+)}}", function(k)
     return vars[k] or ("{{" .. k .. "}}")
   end))
 end
