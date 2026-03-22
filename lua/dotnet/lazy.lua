@@ -73,6 +73,13 @@ return {
     end,
   },
 
+  -- ── Treesitter: C# parser (required by neotest-dotnet for test detection) ─
+  {
+    "nvim-treesitter/nvim-treesitter",
+    opts_extend = { "ensure_installed" },
+    opts = { ensure_installed = { "c_sharp" } },
+  },
+
   -- ── neotest + neotest-dotnet ──────────────────────────────────────────────
   -- dotnet.nvim unconditionally sets t / dt via a FileType cs autocmd.
   -- This spec lists dotnet.nvim as a dependency so lazy initialises it first,
