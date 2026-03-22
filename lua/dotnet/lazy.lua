@@ -19,9 +19,52 @@
 -- What this file DOES install and configure:
 --   • neotest + neotest-dotnet  — class / method / file-aware test running
 --   • dotnet.nvim itself        — build, run, solution/test explorer, DAP…
+--   • mason registry            — adds Crashdummyy registry so roslyn is findable
+--   • seblyng/roslyn.nvim       — C# LSP with inlay hints (var types, params)
 --   • keymaps: t, dt (buffer), gx, <leader>nT/no/nl (global)
 
 return {
+
+  -- ── Mason: Crashdummyy registry (roslyn lives here) ──────────────────────
+  {
+    "mason-org/mason.nvim",
+    opts = function(_, opts)
+      opts.registries = opts.registries or {}
+      local has = false
+      for _, r in ipairs(opts.registries) do
+        if r:find("Crashdummyy") then has = true; break end
+      end
+      if not has then
+        table.insert(opts.registries, "github:Crashdummyy/mason-registry")
+      end
+    end,
+  },
+
+  -- ── Roslyn: C# LSP + inlay hints ─────────────────────────────────────────
+  {
+    "seblyng/roslyn.nvim",
+    ft     = "cs",
+    config = function()
+      require("roslyn").setup()
+
+      -- roslyn.nvim uses vim.lsp.config (Neovim 0.11+ API)
+      vim.lsp.config("roslyn", {
+        on_attach = function(_, bufnr)
+          vim.lsp.inlay_hint.enable(true, { bufnr = bufnr })
+        end,
+        settings = {
+          ["csharp|inlay_hints"] = {
+            csharp_enable_inlay_hints_for_implicit_variable_types = true,
+            csharp_enable_inlay_hints_for_lambda_parameter_types  = true,
+            csharp_enable_inlay_hints_for_types                   = true,
+            dotnet_enable_inlay_hints_for_parameters              = true,
+            dotnet_enable_inlay_hints_for_literal_parameters      = true,
+            dotnet_enable_inlay_hints_for_other_parameters        = true,
+          },
+        },
+      })
+    end,
+  },
 
   -- ── neotest + neotest-dotnet ──────────────────────────────────────────────
   -- dotnet.nvim unconditionally sets t / dt via a FileType cs autocmd.
