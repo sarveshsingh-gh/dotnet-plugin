@@ -28,6 +28,7 @@ return {
   -- ── Mason: Crashdummyy registry (roslyn lives here) ──────────────────────
   {
     "mason-org/mason.nvim",
+    opts_extend = { "ensure_installed" },
     opts = function(_, opts)
       -- preserve the default registry if none have been set yet
       opts.registries = opts.registries or { "github:mason-org/mason-registry" }
@@ -38,6 +39,11 @@ return {
       if not has then
         table.insert(opts.registries, "github:Crashdummyy/mason-registry")
       end
+      -- auto-install .NET tools (LazyVim's mason config reads ensure_installed)
+      opts.ensure_installed = vim.list_extend(opts.ensure_installed or {}, {
+        "roslyn",
+        "netcoredbg",
+      })
     end,
   },
 
