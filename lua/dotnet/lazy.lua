@@ -47,14 +47,6 @@ return {
     end,
   },
 
-  -- ── Enable code lens globally (LazyVim disables it by default) ───────────
-  {
-    "nvim-lspconfig",
-    opts = {
-      codelens = { enabled = true },
-    },
-  },
-
   -- ── Roslyn: C# LSP + inlay hints + code lens ─────────────────────────────
   {
     "seblyng/roslyn.nvim",
