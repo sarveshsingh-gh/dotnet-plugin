@@ -102,13 +102,48 @@ end
 
 -- ── Runner ────────────────────────────────────────────────────────────────────
 
+local _resp_buf = nil  -- reuse same response buffer across requests
+local _resp_win = nil
+
+local function show_response(out)
+  -- Reuse existing buffer if still alive, otherwise create a new one
+  if not _resp_buf or not vim.api.nvim_buf_is_valid(_resp_buf) then
+    _resp_buf = vim.api.nvim_create_buf(false, true)
+    vim.bo[_resp_buf].filetype  = "http"
+    vim.bo[_resp_buf].bufhidden = "hide"
+    vim.keymap.set("n", "q",     "<cmd>close<cr>", { buffer = _resp_buf, silent = true })
+    vim.keymap.set("n", "<esc>", "<cmd>close<cr>", { buffer = _resp_buf, silent = true })
+  end
+
+  vim.bo[_resp_buf].modifiable = true
+  vim.api.nvim_buf_set_lines(_resp_buf, 0, -1, false, out)
+  vim.bo[_resp_buf].modifiable = false
+
+  -- Reuse existing window if still alive, otherwise open a new vsplit
+  if _resp_win and vim.api.nvim_win_is_valid(_resp_win) then
+    vim.api.nvim_win_set_buf(_resp_win, _resp_buf)
+  else
+    local source_win = vim.api.nvim_get_current_win()
+    vim.cmd("botright vsplit")
+    _resp_win = vim.api.nvim_get_current_win()
+    vim.api.nvim_win_set_buf(_resp_win, _resp_buf)
+    vim.api.nvim_win_set_width(_resp_win, math.floor(vim.o.columns * 0.45))
+    vim.wo[_resp_win].number         = false
+    vim.wo[_resp_win].relativenumber = false
+    vim.wo[_resp_win].signcolumn     = "no"
+    vim.wo[_resp_win].wrap           = true
+    -- Return focus to the .http file window
+    vim.api.nvim_set_current_win(source_win)
+  end
+end
+
 local function run_request_at_cursor()
-  local lines      = vim.api.nvim_buf_get_lines(0, 0, -1, false)
-  local cursor     = vim.api.nvim_win_get_cursor(0)[1]
-  local vars       = parse_vars(lines)
-  local sl, el     = find_block(lines, cursor)
-  local block      = vim.list_slice(lines, sl, el)
-  local req        = parse_request(block, vars)
+  local lines  = vim.api.nvim_buf_get_lines(0, 0, -1, false)
+  local cursor = vim.api.nvim_win_get_cursor(0)[1]
+  local vars   = parse_vars(lines)
+  local sl, el = find_block(lines, cursor)
+  local block  = vim.list_slice(lines, sl, el)
+  local req    = parse_request(block, vars)
 
   if not req then
     notify.warn("No HTTP request found at cursor")
@@ -127,24 +162,7 @@ local function run_request_at_cursor()
         if #out == 0 then
           out = { code == 0 and "(empty response)" or "(request failed — check URL / network)" }
         end
-
-        local buf = vim.api.nvim_create_buf(false, true)
-        vim.api.nvim_buf_set_lines(buf, 0, -1, false, out)
-        vim.bo[buf].filetype   = "http"
-        vim.bo[buf].modifiable = false
-        vim.bo[buf].bufhidden  = "wipe"
-
-        -- Open in a right vertical split
-        vim.cmd("botright vsplit")
-        local win = vim.api.nvim_get_current_win()
-        vim.api.nvim_win_set_buf(win, buf)
-        vim.api.nvim_win_set_width(win, math.floor(vim.o.columns * 0.45))
-        vim.wo[win].number         = false
-        vim.wo[win].relativenumber = false
-        vim.wo[win].signcolumn     = "no"
-        vim.wo[win].wrap           = true
-        vim.keymap.set("n", "q",     "<cmd>close<cr>", { buffer = buf, silent = true })
-        vim.keymap.set("n", "<esc>", "<cmd>close<cr>", { buffer = buf, silent = true })
+        show_response(out)
       end)
     end,
   })
