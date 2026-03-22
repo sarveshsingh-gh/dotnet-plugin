@@ -158,6 +158,8 @@ local function run_request_at_cursor()
     on_stderr = function(_, data) vim.list_extend(out, data) end,
     on_exit   = function(_, code)
       vim.schedule(function()
+        -- Strip \r (HTTP CRLF line endings show as ^M in Neovim)
+        for i, l in ipairs(out) do out[i] = l:gsub("\r", "") end
         while #out > 0 and out[#out] == "" do table.remove(out) end
         if #out == 0 then
           out = { code == 0 and "(empty response)" or "(request failed — check URL / network)" }
