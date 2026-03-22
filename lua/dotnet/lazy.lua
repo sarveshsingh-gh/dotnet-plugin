@@ -52,23 +52,33 @@ return {
     "seblyng/roslyn.nvim",
     ft     = "cs",
     config = function()
+      local inlay_hint_settings = {
+        ["csharp|inlay_hints"] = {
+          csharp_enable_inlay_hints_for_implicit_variable_types = true,
+          csharp_enable_inlay_hints_for_lambda_parameter_types  = true,
+          csharp_enable_inlay_hints_for_types                   = true,
+          dotnet_enable_inlay_hints_for_parameters              = true,
+          dotnet_enable_inlay_hints_for_literal_parameters      = true,
+          dotnet_enable_inlay_hints_for_other_parameters        = true,
+        },
+      }
+
+      -- Register settings so workspace/configuration responses include them
+      vim.lsp.config("roslyn", { settings = inlay_hint_settings })
+
       require("roslyn").setup()
 
-      -- roslyn.nvim uses vim.lsp.config (Neovim 0.11+ API)
-      vim.lsp.config("roslyn", {
-        on_attach = function(_, bufnr)
-          vim.lsp.inlay_hint.enable(true, { bufnr = bufnr })
+      -- Push settings explicitly once roslyn finishes project initialization,
+      -- because roslyn may not send workspace/configuration requests for all sections.
+      vim.api.nvim_create_autocmd("User", {
+        pattern = "RoslynInitialized",
+        once    = false,
+        callback = function(ev)
+          local client = vim.lsp.get_client_by_id(ev.data.client_id)
+          if client then
+            client:notify("workspace/didChangeConfiguration", { settings = inlay_hint_settings })
+          end
         end,
-        settings = {
-          ["csharp|inlay_hints"] = {
-            csharp_enable_inlay_hints_for_implicit_variable_types = true,
-            csharp_enable_inlay_hints_for_lambda_parameter_types  = true,
-            csharp_enable_inlay_hints_for_types                   = true,
-            dotnet_enable_inlay_hints_for_parameters              = true,
-            dotnet_enable_inlay_hints_for_literal_parameters      = true,
-            dotnet_enable_inlay_hints_for_other_parameters        = true,
-          },
-        },
       })
     end,
   },
