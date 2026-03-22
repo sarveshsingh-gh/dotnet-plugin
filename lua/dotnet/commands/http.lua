@@ -84,8 +84,10 @@ local function parse_request(block, vars)
   }
 end
 
+local CURL = vim.fn.has("win32") == 1 and "curl.exe" or "curl"
+
 local function build_curl(req)
-  local args = { "curl", "-s", "-i", "-X", req.method }
+  local args = { CURL, "-s", "-i", "-X", req.method }
   for _, h in ipairs(req.headers) do
     table.insert(args, "-H")
     table.insert(args, h.name .. ": " .. h.value)
