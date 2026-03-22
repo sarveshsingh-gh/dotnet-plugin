@@ -113,7 +113,6 @@ local function run_request_at_cursor()
     return
   end
 
-  notify.info(req.method .. "  " .. req.url)
   local out = {}
   vim.fn.jobstart(build_curl(req), {
     stdout_buffered = true,
@@ -129,19 +128,19 @@ local function run_request_at_cursor()
 
         local buf = vim.api.nvim_create_buf(false, true)
         vim.api.nvim_buf_set_lines(buf, 0, -1, false, out)
-        vim.bo[buf].filetype  = "http"
+        vim.bo[buf].filetype   = "http"
         vim.bo[buf].modifiable = false
+        vim.bo[buf].bufhidden  = "wipe"
 
-        local width  = math.floor(vim.o.columns * 0.75)
-        local height = math.min(math.max(#out + 2, 10), math.floor(vim.o.lines * 0.70))
-        vim.api.nvim_open_win(buf, true, {
-          relative  = "editor", width = width, height = height,
-          row = math.floor((vim.o.lines - height) / 2),
-          col = math.floor((vim.o.columns - width) / 2),
-          style = "minimal", border = "rounded",
-          title = " " .. req.method .. "  " .. req.url .. " ",
-          title_pos = "center",
-        })
+        -- Open in a right vertical split
+        vim.cmd("botright vsplit")
+        local win = vim.api.nvim_get_current_win()
+        vim.api.nvim_win_set_buf(win, buf)
+        vim.api.nvim_win_set_width(win, math.floor(vim.o.columns * 0.45))
+        vim.wo[win].number         = false
+        vim.wo[win].relativenumber = false
+        vim.wo[win].signcolumn     = "no"
+        vim.wo[win].wrap           = true
         vim.keymap.set("n", "q",     "<cmd>close<cr>", { buffer = buf, silent = true })
         vim.keymap.set("n", "<esc>", "<cmd>close<cr>", { buffer = buf, silent = true })
       end)
