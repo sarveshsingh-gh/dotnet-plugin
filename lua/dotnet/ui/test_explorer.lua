@@ -154,6 +154,7 @@ local function fqns_to_nodes(proj_path, fqns)
       depth     = 2,
       kind      = "namespace",
       label     = ns ~= "" and short(ns) or "(global)",
+      full_ns   = ns,   -- full namespace for rollup prefix matching
       proj      = proj_path,
       fqn       = nil,
       state     = "none",
@@ -268,9 +269,9 @@ local function render()
         table.insert(hls, { lnum, kind_hl, label_col, suffix_col })
       end
     end
-    -- Suffix (e.g. "  Success") in same state colour, dimmer
+    -- Suffix (e.g. "  Success") in state colour
     if suffix ~= "" and state_hl then
-      table.insert(hls, { lnum, "Comment", suffix_col, -1 })
+      table.insert(hls, { lnum, state_hl, suffix_col, -1 })
     end
 
     if node.collapsed and node.kind ~= "method" then
@@ -462,10 +463,11 @@ local function run_tests(filter, proj_path, label)
         end
 
         -- Roll up classes (depth=4) → namespace (depth=3)
-        -- Class FQN = "Namespace.ClassName", namespace label = "Namespace"
         for _, ns_node in ipairs(S.nodes) do
           if ns_node.depth == 3 and ns_node.proj then
-            local ns_prefix = ns_node.label ~= "(global)" and (ns_node.label .. ".") or ""
+            -- Use full_ns for prefix matching (label is shortened)
+            local ns_prefix = (ns_node.full_ns and ns_node.full_ns ~= "")
+              and (ns_node.full_ns .. ".") or ""
             local worst = nil
             for _, n in ipairs(S.nodes) do
               if n.proj == ns_node.proj and n.depth == 4 and n.fqn
