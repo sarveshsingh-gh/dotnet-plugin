@@ -58,27 +58,31 @@ return {
   -- ── Roslyn: C# LSP + inlay hints + code lens ─────────────────────────────
   {
     "seblyng/roslyn.nvim",
-    ft     = "cs",
+    ft   = "cs",
+    -- init runs at startup even for lazy plugins — settings must be registered
+    -- before roslyn starts so workspace/configuration requests are answered correctly.
+    init = function()
+      vim.lsp.config("roslyn", {
+        settings = {
+          ["csharp|inlay_hints"] = {
+            csharp_enable_inlay_hints_for_implicit_object_creation = true,
+            csharp_enable_inlay_hints_for_implicit_variable_types  = true,
+            csharp_enable_inlay_hints_for_lambda_parameter_types   = true,
+            csharp_enable_inlay_hints_for_types                    = true,
+            dotnet_enable_inlay_hints_for_indexer_parameters       = true,
+            dotnet_enable_inlay_hints_for_literal_parameters       = true,
+            dotnet_enable_inlay_hints_for_object_creation_parameters = true,
+            dotnet_enable_inlay_hints_for_other_parameters         = true,
+            dotnet_enable_inlay_hints_for_parameters               = true,
+          },
+          ["csharp|code_lens"] = {
+            dotnet_enable_references_code_lens = true,
+            dotnet_enable_tests_code_lens      = true,
+          },
+        },
+      })
+    end,
     config = function()
-      local roslyn_settings = {
-        -- inlay hints: var types, parameter names
-        ["csharp|inlay_hints"] = {
-          csharp_enable_inlay_hints_for_implicit_variable_types = true,
-          csharp_enable_inlay_hints_for_lambda_parameter_types  = true,
-          csharp_enable_inlay_hints_for_types                   = true,
-          dotnet_enable_inlay_hints_for_parameters              = true,
-          dotnet_enable_inlay_hints_for_literal_parameters      = true,
-          dotnet_enable_inlay_hints_for_other_parameters        = true,
-        },
-        -- code lens: "N references" / "N implementations" above methods
-        ["csharp|code_lens"] = {
-          dotnet_enable_references_code_lens     = true,
-          dotnet_enable_tests_code_lens          = true,
-        },
-      }
-
-      vim.lsp.config("roslyn", { settings = roslyn_settings })
-
       require("roslyn").setup()
 
       -- Roslyn rejects inlay/codelens requests until the project is fully loaded.
@@ -92,10 +96,7 @@ return {
                 and vim.bo[bufnr].filetype == "cs"
                 and #vim.lsp.get_clients({ name = "roslyn", bufnr = bufnr }) > 0
               then
-                -- refresh inlay hints
-                vim.lsp.inlay_hint.enable(false, { bufnr = bufnr })
-                vim.lsp.inlay_hint.enable(true,  { bufnr = bufnr })
-                -- refresh code lens
+                vim.lsp.inlay_hint.enable(true, { bufnr = bufnr })
                 vim.lsp.codelens.refresh()
               end
             end
