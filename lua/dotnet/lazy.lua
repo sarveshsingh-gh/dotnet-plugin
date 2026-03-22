@@ -34,7 +34,7 @@ return {
       "nvim-neotest/nvim-nio",
       "nvim-lua/plenary.nvim",
       "nvim-treesitter/nvim-treesitter",
-      "Nsidorenco/neotest-dotnet",
+      "Issafalcon/neotest-dotnet",
       "sarveshsingh-gh/dotnet-plugin",  -- must initialise before this config
     },
     config = function()
