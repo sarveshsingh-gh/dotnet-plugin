@@ -68,16 +68,22 @@ return {
 
       require("roslyn").setup()
 
-      -- Push settings explicitly once roslyn finishes project initialization,
-      -- because roslyn may not send workspace/configuration requests for all sections.
+      -- Roslyn returns warnings for inlay hint requests made before the project is
+      -- loaded. Once initialization completes, force-refresh hints for all cs buffers.
       vim.api.nvim_create_autocmd("User", {
-        pattern = "RoslynInitialized",
-        once    = false,
-        callback = function(ev)
-          local client = vim.lsp.get_client_by_id(ev.data.client_id)
-          if client then
-            client:notify("workspace/didChangeConfiguration", { settings = inlay_hint_settings })
-          end
+        pattern  = "RoslynInitialized",
+        callback = function()
+          vim.defer_fn(function()
+            for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
+              if vim.api.nvim_buf_is_valid(bufnr)
+                and vim.bo[bufnr].filetype == "cs"
+                and #vim.lsp.get_clients({ name = "roslyn", bufnr = bufnr }) > 0
+              then
+                vim.lsp.inlay_hint.enable(false, { bufnr = bufnr })
+                vim.lsp.inlay_hint.enable(true,  { bufnr = bufnr })
+              end
+            end
+          end, 500)
         end,
       })
     end,
