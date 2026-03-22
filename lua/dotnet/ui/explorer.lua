@@ -75,15 +75,9 @@ local function sln_icon()
   return g(0xF0E8) .. " "
 end
 
-local function proj_icon_for(proj_path)
-  local kind = project.kind(proj_path)
-  -- devicons returns the same icon for all .csproj regardless of filename,
-  -- so use distinct nerd-font codepoints per project kind.
-  if kind == "web"      then return g(0xF0AC) .. " " end  -- globe   (API / Web)
-  if kind == "console"  then return g(0xF489) .. " " end  -- term    (Console)
-  if kind == "test"     then return g(0xF487) .. " " end
-  if kind == "function" then return g(0xF487) .. " " end
-  return g(0xF487) .. " "                                  -- package (Class Library)
+local function proj_icon_for(_proj_path)
+  local ic = folder_icon(true)  -- same folder icon used for dirs
+  return ic
 end
 
 local I = {
