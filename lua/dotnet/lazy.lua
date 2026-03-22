@@ -150,7 +150,7 @@ return {
         pattern  = "cs",
         callback = function(ev)
           local n = require("neotest")
-          -- t  : method in method → that method
+          -- t  : cursor in method → that method
           --      cursor in class  → whole class
           --      elsewhere        → whole file
           vim.keymap.set("n", "t", function() n.run.run() end,
@@ -160,6 +160,12 @@ return {
             { buffer = ev.buf, desc = "Test debug nearest" })
         end,
       })
+
+      -- Neotest global keymaps
+      local map = vim.keymap.set
+      map("n", "<leader>nT", function() require("neotest").summary.toggle() end,      { desc = "Neotest summary toggle" })
+      map("n", "<leader>no", function() require("neotest").output_panel.toggle() end, { desc = "Neotest output panel" })
+      map("n", "<leader>nl", function() require("neotest").run.run_last() end,        { desc = "Neotest run last" })
     end,
   },
 
@@ -189,6 +195,10 @@ return {
           },
         },
       })
+
+      -- gx: open job log picker (background build/test/run jobs)
+      vim.keymap.set("n", "gx", function() require("dotnet.telescope.jobs").open() end,
+        { desc = "Dotnet job log" })
     end,
   },
 
