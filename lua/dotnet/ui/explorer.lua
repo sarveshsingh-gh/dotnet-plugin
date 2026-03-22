@@ -81,8 +81,8 @@ local function proj_icon_for(proj_path)
   -- so use distinct nerd-font codepoints per project kind.
   if kind == "web"      then return g(0xF0AC) .. " " end  -- globe   (API / Web)
   if kind == "console"  then return g(0xF489) .. " " end  -- term    (Console)
-  if kind == "test"     then return g(0xF091) .. " " end  -- trophy  (Test)
-  if kind == "function" then return g(0xF013) .. " " end  -- cog     (Azure Function)
+  if kind == "test"     then return g(0xEA6A) .. " " end  -- beaker/flask (nf-cod-beaker)
+  if kind == "function" then return g(0xEB0C) .. " " end  -- zap/bolt     (nf-cod-zap)
   return g(0xF487) .. " "                                  -- package (Class Library)
 end
 
