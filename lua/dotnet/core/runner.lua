@@ -185,7 +185,11 @@ function M.stop_all()
       if jid then pcall(vim.fn.jobstop, jid); stopped = stopped + 1 end
     end
   end
-  require("dotnet.notify").info("Stopped " .. stopped .. " process(es)")
+  if stopped > 0 then
+    require("dotnet.notify").info("Stopped " .. stopped .. " process(es)")
+  else
+    require("dotnet.notify").info("No running processes")
+  end
 end
 
 --- Return list of active jobs for the jobs picker.
