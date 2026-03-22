@@ -76,8 +76,7 @@ local function sln_icon()
 end
 
 local function proj_icon_for(_proj_path)
-  local ic = folder_icon(true)  -- same folder icon used for dirs
-  return ic
+  return folder_icon(true)  -- returns ic, hl
 end
 
 local I = {
@@ -174,13 +173,13 @@ local function build_nodes()
     local proj_dir  = vim.fn.fnamemodify(proj_path, ":h")
     if S.collapsed[proj_path] == nil then S.collapsed[proj_path] = true end
     local is_coll   = S.collapsed[proj_path]
-    local pio       = proj_icon_for(proj_path)
+    local pio, pihl = proj_icon_for(proj_path)
 
     table.insert(nodes, {
       text      = pio .. short(proj_name),
       indent    = 1, kind = "project", path = proj_path, dir = proj_dir,
       collapsed = is_coll,
-      _ibytes   = #pio, _ihl = nil,
+      _ibytes   = #pio, _ihl = pihl,
     })
 
     if not is_coll then
