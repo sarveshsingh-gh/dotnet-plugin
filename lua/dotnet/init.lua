@@ -17,6 +17,7 @@ function M.setup(user_opts)
   require("dotnet.commands.nuget")
   require("dotnet.commands.ef")
   require("dotnet.commands.docker")
+  require("dotnet.commands.migrate")
 
   -- Register jobs + files commands in palette
   local cmd = require("dotnet.commands.init")
