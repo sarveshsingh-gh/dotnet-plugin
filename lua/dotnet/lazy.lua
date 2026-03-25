@@ -88,7 +88,7 @@ return {
                 and vim.bo[bufnr].filetype == "cs"
                 and #vim.lsp.get_clients({ name = "roslyn", bufnr = bufnr }) > 0
               then
-                vim.lsp.inlay_hint.enable(true, { bufnr = bufnr })
+                vim.lsp.inlay_hint.enable(false, { bufnr = bufnr })
                 vim.lsp.codelens.refresh()
               end
             end
