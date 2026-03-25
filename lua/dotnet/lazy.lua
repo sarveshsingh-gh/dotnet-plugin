@@ -189,16 +189,6 @@ return {
       -- gx: open job log picker (background build / test / run jobs)
       vim.keymap.set("n", "gx", function() require("dotnet.telescope.jobs").open() end,
         { desc = "Dotnet job log" })
-
-      require("dotnet.commands.init").register("lsp.inlay_hints", {
-        category = "lsp",
-        icon     = " ",
-        desc     = "Toggle inlay hints",
-        run      = function()
-          local enabled = vim.lsp.inlay_hint.is_enabled({ bufnr = 0 })
-          vim.lsp.inlay_hint.enable(not enabled, { bufnr = 0 })
-        end,
-      })
     end,
   },
 
