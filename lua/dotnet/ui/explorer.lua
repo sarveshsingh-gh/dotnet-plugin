@@ -106,7 +106,7 @@ local KIND_HL = {
 
 -- ── Forward declarations ───────────────────────────────────────────────────────
 
-local HEADER_OFFSET = 0   -- title now lives in the tabufline treeOffset
+local HEADER_OFFSET = 2   -- "  Solution Explorer" + separator
 
 local refresh        -- defined below
 local action_open_file  -- defined below
@@ -256,7 +256,7 @@ end
 local function render()
   if not S.buf or not vim.api.nvim_buf_is_valid(S.buf) then return end
   local width = S.win and vim.api.nvim_win_is_valid(S.win) and vim.api.nvim_win_get_width(S.win) or 40
-  local lines   = {}
+  local lines   = { "  Solution Explorer", string.rep("─", width) }
   local visible = {}  -- nodes actually rendered, in order
   local skip_above = nil
   for _, n in ipairs(S.nodes) do
