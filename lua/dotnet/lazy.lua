@@ -88,7 +88,7 @@ return {
                 and vim.bo[bufnr].filetype == "cs"
                 and #vim.lsp.get_clients({ name = "roslyn", bufnr = bufnr }) > 0
               then
-                vim.lsp.inlay_hint.enable(true, { bufnr = bufnr })
+                vim.lsp.inlay_hint.enable(false, { bufnr = bufnr })
                 vim.lsp.codelens.refresh()
               end
             end
@@ -192,13 +192,19 @@ return {
 
       require("dotnet.commands.init").register("lsp.inlay_hints", {
         category = "lsp",
-        icon     = " ",
+        icon     = "󰴑 ",
         desc     = "Toggle inlay hints",
+        key      = "<leader>ci",
         run      = function()
           local enabled = vim.lsp.inlay_hint.is_enabled({ bufnr = 0 })
           vim.lsp.inlay_hint.enable(not enabled, { bufnr = 0 })
         end,
       })
+
+      vim.keymap.set("n", "<leader>ci", function()
+        local enabled = vim.lsp.inlay_hint.is_enabled({ bufnr = 0 })
+        vim.lsp.inlay_hint.enable(not enabled, { bufnr = 0 })
+      end, { desc = "Toggle inlay hints" })
     end,
   },
 
